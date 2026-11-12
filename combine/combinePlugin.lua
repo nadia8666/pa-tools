@@ -2741,7 +2741,8 @@ end)
 
 local function reloadButtons()
 	toolbar = shared.paTools
-	toggleButton = toolbar.addButton("Combine", "Combine selected geometry and bake its appearance", "rbxassetid://4458901886")
+	toggleButton =
+		toolbar.addButton("Combine", "Combine selected geometry and bake its appearance", "rbxassetid://4458901886")
 	toolbar.setButtonHandler("Combine", function()
 		widget.Enabled = not widget.Enabled
 		toggleButton:SetActive(widget.Enabled)
@@ -2756,7 +2757,6 @@ end
 
 toolbarCallbacks.combine = reloadButtons
 reloadButtons()
-
 
 plugin.Unloading:Connect(function()
 	toolbarCallbacks.combine = nil
