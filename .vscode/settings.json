@@ -1,4 +1,3 @@
 {
-  "luau-lsp.platform.type": "roblox",
-  "luau-lsp.sourcemap.enabled": false
+  "luau-lsp.platform.type": "roblox"
 }
