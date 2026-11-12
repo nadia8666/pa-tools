@@ -409,16 +409,13 @@ local function applyCuts()
 		end
 		for _, instance in game:GetDescendants() do
 			if instance:IsA("JointInstance") and (instance.Part0 == source or instance.Part1 == source) then
-				table.insert(
-					constraintStates,
-					{
-						instance = instance,
-						part0 = instance.Part0,
-						part1 = instance.Part1,
-						c0 = instance.C0,
-						c1 = instance.C1,
-					}
-				)
+				table.insert(constraintStates, {
+					instance = instance,
+					part0 = instance.Part0,
+					part1 = instance.Part1,
+					c0 = instance.C0,
+					c1 = instance.C1,
+				})
 			elseif
 				(instance:IsA("WeldConstraint") or instance:IsA("NoCollisionConstraint"))
 				and (instance.Part0 == source or instance.Part1 == source)

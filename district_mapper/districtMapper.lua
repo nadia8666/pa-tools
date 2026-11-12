@@ -179,16 +179,12 @@ local function makePanel(order)
 	}, root)
 	create("UICorner", { CornerRadius = UDim.new(0, 8) }, panel)
 	create("UIStroke", { Color = COLORS.stroke, Thickness = 1, Transparency = 0.45 }, panel)
-	create(
-		"UIPadding",
-		{
-			PaddingTop = UDim.new(0, 8),
-			PaddingBottom = UDim.new(0, 8),
-			PaddingLeft = UDim.new(0, 8),
-			PaddingRight = UDim.new(0, 8),
-		},
-		panel
-	)
+	create("UIPadding", {
+		PaddingTop = UDim.new(0, 8),
+		PaddingBottom = UDim.new(0, 8),
+		PaddingLeft = UDim.new(0, 8),
+		PaddingRight = UDim.new(0, 8),
+	}, panel)
 	create("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, panel)
 	return panel
 end
