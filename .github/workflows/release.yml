@@ -3,14 +3,14 @@ name: release
 on:
   push:
     tags:
-      - "**"
+      - "v*"
 
 permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: true
+  group: release
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -103,11 +103,32 @@ jobs:
 
           Compress-Archive -Path "dist/plugins/*" -DestinationPath "dist/pa-tools-plugins.zip" -Force
 
+      - name: prepare release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "release tags must use semantic versioning, for example v1.2.3"
+            exit 1
+          fi
+
+          notes_file=".github/releases/${GITHUB_REF_NAME}.md"
+
+          if [[ ! -f "$notes_file" ]]; then
+            echo "missing release notes: $notes_file"
+            echo "create the release notes from RELEASE_TEMPLATE.md before pushing the tag"
+            exit 1
+          fi
+
+          sed "s|TAG|${GITHUB_REF_NAME}|g" "$notes_file" > "$RUNNER_TEMP/release-notes.md"
+
       - name: publish release assets
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          generate_release_notes: true
+          body_path: ${{ runner.temp }}/release-notes.md
+          generate_release_notes: false
           fail_on_unmatched_files: true
           files: |
             dist/windows/*.exe
