@@ -54,6 +54,19 @@ api.toolbar = state.toolbar
 api.ready = true
 shared.paTools = api
 
+local toolbarCallbacks = shared.paToolbarCallbacks
+if not toolbarCallbacks then
+	toolbarCallbacks = {}
+	shared.paToolbarCallbacks = toolbarCallbacks
+end
+
+for _, callback in toolbarCallbacks do
+	local ok, err = pcall(callback)
+	if not ok then
+		warn("PA Tools could not restore a plugin toolbar: " .. tostring(err))
+	end
+end
+
 plugin.Unloading:Connect(function()
 	if shared.paTools == api then
 		shared.paTools = nil
