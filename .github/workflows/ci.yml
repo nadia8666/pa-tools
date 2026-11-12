@@ -53,16 +53,5 @@ jobs:
             exit 1
           fi
 
-          curl --fail --location --silent --show-error \
-            https://luau-lsp.pages.dev/type-definitions/globalTypes.PluginSecurity.d.luau \
-            --output "$RUNNER_TEMP/globalTypes.d.luau"
-          curl --fail --location --silent --show-error \
-            https://luau-lsp.pages.dev/api-docs/en-us.json \
-            --output "$RUNNER_TEMP/api-docs.json"
-
           stylua --check "${luau_files[@]}"
-          luau-lsp analyze \
-            --platform roblox \
-            --definitions:@roblox="$RUNNER_TEMP/globalTypes.d.luau" \
-            --docs="$RUNNER_TEMP/api-docs.json" \
-            "${luau_files[@]}"
+          luau-lsp analyze --platform roblox "${luau_files[@]}"
