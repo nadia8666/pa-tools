@@ -59,7 +59,7 @@ jobs:
           trap 'rm -f "$definitions_file"' EXIT
 
           curl --fail --silent --show-error --location \
-            https://luau-lsp.pages.dev/type-definitions/globalTypes.PluginSecurity.d.luau \
+            https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/main/scripts/globalTypes.PluginSecurity.d.luau \
             --output "$definitions_file"
 
           luau-lsp analyze \

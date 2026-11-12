@@ -2,7 +2,6 @@ local AssetService = game:GetService("AssetService")
 local ChangeHistoryService = game:GetService("ChangeHistoryService")
 local Selection = game:GetService("Selection")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
 local ServerStorage = game:GetService("ServerStorage")
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
@@ -108,14 +107,14 @@ local root = create("ScrollingFrame", {
 	ScrollBarImageColor3 = COLORS.sub,
 }, widget)
 
-local padding = create("UIPadding", {
+create("UIPadding", {
 	PaddingTop = UDim.new(0, 12),
 	PaddingBottom = UDim.new(0, 12),
 	PaddingLeft = UDim.new(0, 12),
 	PaddingRight = UDim.new(0, 12),
 }, root)
 
-local layout = create("UIListLayout", {
+create("UIListLayout", {
 	Padding = UDim.new(0, 8),
 	SortOrder = Enum.SortOrder.LayoutOrder,
 }, root)
@@ -147,7 +146,7 @@ local function makeButton(text, order, callback, parent)
 		LayoutOrder = order,
 	}, parent or root)
 	create("UICorner", { CornerRadius = UDim.new(0, 6) }, button)
-	local stroke = create("UIStroke", { Color = COLORS.stroke, Thickness = 1, Transparency = 0.35 }, button)
+	create("UIStroke", { Color = COLORS.stroke, Thickness = 1, Transparency = 0.35 }, button)
 	button.Activated:Connect(callback)
 	return button
 end
@@ -191,7 +190,6 @@ end
 
 local statusLabel = makeLabel("Create a group to begin.", 38, 1)
 local groupNameInput
-local createGroupButton
 local pointButton
 local linkButton
 local extrudeButton
@@ -505,19 +503,20 @@ local function getBoundaries(group)
 					end
 				end
 				if closed and #boundary >= 3 then
-					local unique = {}
+					local seenPoints = {}
+					local isUnique = true
 					local area = 0
 					for index, pointIndex in boundary do
-						if unique[pointIndex] then
-							unique = nil
+						if seenPoints[pointIndex] then
+							isUnique = false
 							break
 						end
-						unique[pointIndex] = true
+						seenPoints[pointIndex] = true
 						local first = group.points[pointIndex].position
 						local second = group.points[boundary[index % #boundary + 1]].position
 						area += first.X * second.Z - second.X * first.Z
 					end
-					if unique and area > 0.001 then
+					if isUnique and area > 0.001 then
 						table.insert(boundaries, boundary)
 					end
 				end
@@ -532,7 +531,7 @@ local function getBoundaries(group)
 	end)
 	return boundaries, boundaryError
 end
-local function getBoundary(group)
+local function _getBoundary(group)
 	local boundaries, err = getBoundaries(group)
 	if not boundaries or #boundaries ~= 1 then
 		return nil,
@@ -2168,7 +2167,6 @@ end)
 
 connect(plugin.Unloading, function()
 	toolbar.removeButtonHandler("districtMapper")
-	unloading = true
 	for _, connection in connections do
 		connection:Disconnect()
 	end

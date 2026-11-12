@@ -320,7 +320,10 @@ local function addChange(kind, file, origin, lines)
 
 	table.insert(changeEntries, row)
 	if #changeEntries > MAX_CHANGES then
-		table.remove(changeEntries, 1):Destroy()
+		local removed = table.remove(changeEntries, 1)
+		if removed then
+			removed:Destroy()
+		end
 	end
 end
 
@@ -456,7 +459,10 @@ local function addLog(key, origin, rows)
 
 	table.insert(logEntries, entry)
 	if #logEntries > MAX_LOG then
-		table.remove(logEntries, 1):Destroy()
+		local removed = table.remove(logEntries, 1)
+		if removed then
+			removed:Destroy()
+		end
 	end
 end
 
@@ -758,7 +764,7 @@ do
 	task.wait()
 	toolbar = shared.paTools
 end
-local toggle = toolbar.addButton("pSync", "Show sync status", "")
+toolbar.addButton("pSync", "Show sync status", "")
 toolbar.setButtonHandler("pSync", function()
 	widget.Enabled = not widget.Enabled
 end)
@@ -1541,9 +1547,9 @@ local function onMessage(message)
 	end
 	paused = response.paused
 	for _, deleted in response.deletes or {} do
-		local ok, err = pcall(applyDelete, deleted)
-		if not ok then
-			warn("[pSync] delete failed: " .. tostring(err))
+		local deleteOk, deleteError = pcall(applyDelete, deleted)
+		if not deleteOk then
+			warn("[pSync] delete failed: " .. tostring(deleteError))
 		end
 	end
 	if response.tracked then
@@ -1574,17 +1580,17 @@ local function onMessage(message)
 		end)
 		task.spawn(function()
 			for _, create in creates do
-				local ok, err = pcall(applyCreate, create)
-				if not ok then
-					warn("[pSync] create failed: " .. tostring(err))
+				local createOk, createError = pcall(applyCreate, create)
+				if not createOk then
+					warn("[pSync] create failed: " .. tostring(createError))
 				end
 			end
 		end)
 	end
 	for _, cmd in response.attrCommands or {} do
-		local ok, err = pcall(applyAttrCommand, cmd)
-		if not ok then
-			warn("[pSync] attribute apply failed: " .. tostring(err))
+		local attributeOk, attributeError = pcall(applyAttrCommand, cmd)
+		if not attributeOk then
+			warn("[pSync] attribute apply failed: " .. tostring(attributeError))
 		end
 	end
 	for _, cmd in response.commands do

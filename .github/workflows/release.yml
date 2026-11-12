@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -52,7 +52,18 @@ jobs:
           fi
 
           stylua "${luau_files[@]}"
-          luau-lsp analyze --platform roblox "${luau_files[@]}"
+
+          definitions_file="$(mktemp)"
+          trap 'rm -f "$definitions_file"' EXIT
+
+          curl --fail --silent --show-error --location \
+            https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/main/scripts/globalTypes.PluginSecurity.d.luau \
+            --output "$definitions_file"
+
+          luau-lsp analyze \
+            --platform roblox \
+            --definitions="roblox=$definitions_file" \
+            "${luau_files[@]}"
 
       - name: build rust executables
         shell: bash

@@ -140,7 +140,7 @@ local title = createLabel("Combine", 22, colors.text, 1, header)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 18
 
-local subtitle = createLabel("Bake selected geometry into optimized MeshParts.", 18, colors.sub, 2, header)
+createLabel("Bake selected geometry into optimized MeshParts.", 18, colors.sub, 2, header)
 
 local status = createLabel("Worker disconnected. Start the Combine worker to continue.", 0, colors.sub, 1, operations)
 status.AutomaticSize = Enum.AutomaticSize.Y
@@ -612,7 +612,9 @@ local function loadOutputUnsafe(assetIds, assetMaterials, assetSources, textureA
 						local function setMap(property, slot)
 							local assetId = maps[slot]
 							assert(assetId, string.format("Worker omitted the %s map for page %d", slot, texturePage))
-							appearance[property] = Content.fromAssetId(tonumber(assetId))
+							local numericAssetId = tonumber(assetId)
+							assert(numericAssetId)
+							appearance[property] = Content.fromAssetId(numericAssetId)
 						end
 						if materialBinding.baseColorPage then
 							setMap("ColorMapContent", "color")
@@ -808,7 +810,9 @@ local function loadGeometryOutput(geometryAssets, assetMaterials, assetSources, 
 								textureAssetId,
 								string.format("Worker omitted the %s map for page %d", slot, texturePage)
 							)
-							appearance[property] = Content.fromAssetId(tonumber(textureAssetId))
+							local numericAssetId = tonumber(textureAssetId)
+							assert(numericAssetId)
+							appearance[property] = Content.fromAssetId(numericAssetId)
 						end
 						if binding.baseColorPage then
 							setMap("ColorMapContent", "color")
@@ -940,7 +944,7 @@ local function normalizeSelection(selected)
 	return roots
 end
 
-local function cloneInstance(instance)
+local function _cloneInstance(instance)
 	local archivable = instance.Archivable
 	if not archivable then
 		instance.Archivable = true
@@ -963,6 +967,19 @@ local function getSourceTargets(source, sourceAssignments, identity)
 		)
 	end
 	return assigned
+end
+
+local function getNearestPart(targets, position)
+	local nearest
+	local nearestDistance = math.huge
+	for _, target in targets do
+		local distance = (target.Position - position).Magnitude
+		if distance < nearestDistance then
+			nearest = target
+			nearestDistance = distance
+		end
+	end
+	return nearest
 end
 
 local function remapPartReference(constraint, property, sourceTargets)
@@ -1016,7 +1033,7 @@ local function getReferenceInstances(sourceTargets)
 	return instances
 end
 
-local function remapConstraints(sourceTargets)
+local function _remapConstraints(sourceTargets)
 	for _, instance in getReferenceInstances(sourceTargets) do
 		if instance:IsA("JointInstance") or instance:IsA("WeldConstraint") or instance:IsA("NoCollisionConstraint") then
 			remapPartReference(instance, "Part0", sourceTargets)
@@ -1030,7 +1047,7 @@ local function remapConstraints(sourceTargets)
 	end
 end
 
-local function remapObjectReferences(sourceTargets)
+local function _remapObjectReferences(sourceTargets)
 	for _, instance in getReferenceInstances(sourceTargets) do
 		if instance:IsA("ObjectValue") then
 			local targets = instance.Value and sourceTargets[instance.Value]
@@ -1046,7 +1063,7 @@ local function remapObjectReferences(sourceTargets)
 	end
 end
 
-local function applyMergedProperties(sourceTargets, sourceAssemblyAnchored)
+local function _applyMergedProperties(sourceTargets, sourceAssemblyAnchored)
 	local merged = {}
 	for source, targets in sourceTargets do
 		for _, target in targets do
@@ -1709,8 +1726,6 @@ local function onMessage(message)
 		for _ in sourceTextures do
 			sourceTextureCount += 1
 		end
-		local mapAssetCount = #(response.textureAssets or {})
-		local tileCount = #(response.textureBindings or {})
 		local textureErrors = response.textureErrors or {}
 		for _, issue in textureErrors do
 			warn(string.format("[PA Combine] texture error: %s [%s]: %s", issue.name, issue.slot, issue.error))
