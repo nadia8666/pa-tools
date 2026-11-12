@@ -1,0 +1,68 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: install rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: install project tools
+        uses: CompeyDev/setup-rokit@v0.2.1
+        with:
+          path: .
+          token: ${{ github.token }}
+
+      - name: build rust projects
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          manifests=(
+            backend/combine/Cargo.toml
+            backend/sync/Cargo.toml
+          )
+
+          for manifest in "${manifests[@]}"; do
+            echo "::group::checking $manifest"
+            cargo fmt --manifest-path "$manifest" -- --check
+            cargo build --locked --manifest-path "$manifest"
+            echo "built: $manifest"
+            echo "::endgroup::"
+          done
+
+      - name: check luau formatting and types
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t luau_files < <(find . -type f \( -name '*.lua' -o -name '*.luau' \) -not -path './target/*' | sort)
+
+          if [[ ${#luau_files[@]} -eq 0 ]]; then
+            echo "no Luau files found"
+            exit 1
+          fi
+
+          stylua --check "${luau_files[@]}"
+          luau-lsp analyze --platform roblox "${luau_files[@]}"
