@@ -368,7 +368,12 @@ local function decodeBase64(code)
 		local third = values[thirdCharacter]
 		local fourth = values[fourthCharacter]
 		local isFinal = index + 3 == #code
-		if first == nil or second == nil or (third == nil and thirdCharacter ~= "=") or (fourth == nil and fourthCharacter ~= "=") then
+		if
+			first == nil
+			or second == nil
+			or (third == nil and thirdCharacter ~= "=")
+			or (fourth == nil and fourthCharacter ~= "=")
+		then
 			error("The code contains invalid Base64 data.")
 		end
 		if thirdCharacter == "=" then
