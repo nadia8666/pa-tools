@@ -30,17 +30,9 @@ do
 	task.wait()
 	toolbar = shared.paTools
 end
-toolbar.addButton(
-	"Mark Cuttable",
-	"Assign a shared hole-cutter group to the selected parts",
-	"rbxassetid://1507949215"
-)
+toolbar.addButton("Mark Cuttable", "Assign a shared hole-cutter group to the selected parts", "rbxassetid://1507949215")
 toolbar.addButton("Add Cutter", "Place a cutter for the current hole-cutter group", "rbxassetid://1507949215")
-toolbar.addButton(
-	"Apply Holes",
-	"Subtract every cutter in the group from every marked part",
-	"rbxassetid://1507949215"
-)
+toolbar.addButton("Apply Holes", "Subtract every cutter in the group from every marked part", "rbxassetid://1507949215")
 toolbar.addButton("Merge Parts", "Merge selected parts along their aligned axes", "rbxassetid://1507949215")
 
 local mouse = plugin:GetMouse()
