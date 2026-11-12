@@ -726,7 +726,10 @@ showDetail = function(detail)
 	local parts = {}
 	for i, line in lines do
 		if i > MAX_DETAIL_LINES then
-			table.insert(parts, `<font color="#{GREY:ToHex()}">… {#lines - MAX_DETAIL_LINES} more lines not shown</font>`)
+			table.insert(
+				parts,
+				`<font color="#{GREY:ToHex()}">… {#lines - MAX_DETAIL_LINES} more lines not shown</font>`
+			)
 			break
 		end
 		local text = line.text or line[1] or ""
@@ -743,7 +746,15 @@ showDetail = function(detail)
 end
 
 local toolbar = shared.paTools
-while not (toolbar and toolbar.ready and type(toolbar.addButton) == "function" and type(toolbar.setButtonHandler) == "function" and type(toolbar.removeButtonHandler) == "function") do
+while
+	not (
+		toolbar
+		and toolbar.ready
+		and type(toolbar.addButton) == "function"
+		and type(toolbar.setButtonHandler) == "function"
+		and type(toolbar.removeButtonHandler) == "function"
+	)
+do
 	task.wait()
 	toolbar = shared.paTools
 end
@@ -754,7 +765,11 @@ end)
 
 local function setStatus(text)
 	status.Text = text
-	dot.BackgroundColor3 = if syncIgnored then COLORS.bad elseif paused or playtestPaused then COLORS.warn elseif connected then COLORS.ok else COLORS.bad
+	dot.BackgroundColor3 = if syncIgnored
+		then COLORS.bad
+		elseif paused or playtestPaused then COLORS.warn
+		elseif connected then COLORS.ok
+		else COLORS.bad
 	resume.Visible = paused and not playtestPaused
 end
 
@@ -1100,7 +1115,11 @@ local function checkCandidates()
 	for instance in ready do
 		local ancestor = instance.Parent
 		while ancestor and ancestor ~= game do
-			if ancestor:IsA("LuaSourceContainer") and not keyByScript[ancestor] and ancestor.Name ~= ancestor.ClassName then
+			if
+				ancestor:IsA("LuaSourceContainer")
+				and not keyByScript[ancestor]
+				and ancestor.Name ~= ancestor.ClassName
+			then
 				above[ancestor] = true
 				candidates[ancestor] = nil
 			end
@@ -1672,7 +1691,11 @@ task.spawn(function()
 					end
 					local reports = collectReports()
 					local attrReports = collectAttrReports()
-					local hasOutbox = #outbox.created + #outbox.deleted + #outbox.moved + #outbox.missing + #outbox.refused
+					local hasOutbox = #outbox.created
+							+ #outbox.deleted
+							+ #outbox.moved
+							+ #outbox.missing
+							+ #outbox.refused
 						> 0
 					if #reports > 0 or #acks > 0 or resumeRequested or hasOutbox or #attrReports > 0 then
 						send({

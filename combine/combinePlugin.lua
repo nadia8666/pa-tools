@@ -15,11 +15,20 @@ end
 
 local workerUrl = "ws://127.0.0.1:34873"
 local toolbar = shared.paTools
-while not (toolbar and toolbar.ready and type(toolbar.addButton) == "function" and type(toolbar.setButtonHandler) == "function" and type(toolbar.removeButtonHandler) == "function") do
+while
+	not (
+		toolbar
+		and toolbar.ready
+		and type(toolbar.addButton) == "function"
+		and type(toolbar.setButtonHandler) == "function"
+		and type(toolbar.removeButtonHandler) == "function"
+	)
+do
 	task.wait()
 	toolbar = shared.paTools
 end
-local toggleButton = toolbar.addButton("Combine", "Combine selected geometry and bake its appearance", "rbxassetid://4458901886")
+local toggleButton =
+	toolbar.addButton("Combine", "Combine selected geometry and bake its appearance", "rbxassetid://4458901886")
 
 local widget = plugin:CreateDockWidgetPluginGuiAsync(
 	"PACombine",
@@ -218,7 +227,14 @@ chunkInput.Parent = settings
 corner(chunkInput, 8)
 stroke(chunkInput, colors.stroke, 0.5)
 
-createLabel("Source textures retain their original dimensions. Oversized GLBs are split automatically after encoding.", 0, colors.sub, 4, settings).AutomaticSize = Enum.AutomaticSize.Y
+createLabel(
+	"Source textures retain their original dimensions. Oversized GLBs are split automatically after encoding.",
+	0,
+	colors.sub,
+	4,
+	settings
+).AutomaticSize =
+	Enum.AutomaticSize.Y
 local maxTrianglesPerChunk = 20000
 
 chunkInput.FocusLost:Connect(function()
@@ -317,7 +333,13 @@ local function countSelection()
 			end
 		end
 	end
-	selectionStats.Text = string.format("Selection: %d roots · %d geometry parts · %d unions · %d descendants", #selected, geometry, unions, descendants)
+	selectionStats.Text = string.format(
+		"Selection: %d roots · %d geometry parts · %d unions · %d descendants",
+		#selected,
+		geometry,
+		unions,
+		descendants
+	)
 	return selected, geometry, descendants
 end
 
@@ -349,9 +371,15 @@ local function loadOutputUnsafe(assetIds, assetMaterials, assetSources, textureA
 		emissive = true,
 	}
 	for _, binding in textureAssets or {} do
-		assert(type(binding.page) == "number" and binding.page >= 0 and binding.page % 1 == 0, "Worker returned an invalid texture page")
+		assert(
+			type(binding.page) == "number" and binding.page >= 0 and binding.page % 1 == 0,
+			"Worker returned an invalid texture page"
+		)
 		assert(supportedTextureSlots[binding.slot], "Worker returned an unsupported texture slot")
-		assert(type(binding.assetId) == "string" and binding.assetId:match("^%d+$"), "Worker returned an invalid texture asset ID")
+		assert(
+			type(binding.assetId) == "string" and binding.assetId:match("^%d+$"),
+			"Worker returned an invalid texture asset ID"
+		)
 		local page = textureAssetsByPage[binding.page] or {}
 		assert(not page[binding.slot], "Worker returned a duplicate texture asset binding")
 		page[binding.slot] = binding.assetId
@@ -361,43 +389,101 @@ local function loadOutputUnsafe(assetIds, assetMaterials, assetSources, textureA
 	assert(assetMaterials and #assetMaterials == #assetIds, "Worker returned incomplete material bindings")
 	assert(assetSources and #assetSources == #assetIds, "Worker returned incomplete source assignments")
 	for index, assetId in assetIds do
-		assert(type(assetId) == "string" and assetId:match("^%d+$"), string.format("Worker returned an invalid geometry asset ID at index %d", index))
+		assert(
+			type(assetId) == "string" and assetId:match("^%d+$"),
+			string.format("Worker returned an invalid geometry asset ID at index %d", index)
+		)
 		local binding = assetMaterials[index]
 		assert(type(binding) == "table", string.format("Worker omitted material metadata for geometry asset %d", index))
-		assert(type(binding.material) == "string" and Enum.Material[binding.material], string.format("Worker returned an invalid material for geometry asset %d", index))
-		assert(type(binding.materialVariant) == "string", string.format("Worker returned an invalid material variant for geometry asset %d", index))
-		assert(type(binding.doubleSided) == "boolean", string.format("Worker returned invalid double-sided metadata for geometry asset %d", index))
-		assert(type(binding.reflectance) == "number" and binding.reflectance >= 0 and binding.reflectance <= 1, string.format("Worker returned invalid reflectance for geometry asset %d", index))
-		assert(type(binding.hasMetalness) == "boolean" and type(binding.hasRoughness) == "boolean", string.format("Worker returned invalid metallic or roughness metadata for geometry asset %d", index))
-		assert(not binding.hasMetalness or binding.metallicRoughnessPage ~= nil, string.format("Worker omitted the metalness page for geometry asset %d", index))
-		assert(not binding.hasRoughness or binding.metallicRoughnessPage ~= nil, string.format("Worker omitted the roughness page for geometry asset %d", index))
-		assert(binding.alphaMode == nil or (type(binding.alphaMode) == "string" and Enum.AlphaMode[binding.alphaMode]), string.format("Worker returned an invalid alpha mode for geometry asset %d", index))
-		assert(binding.resampleMode == nil or (type(binding.resampleMode) == "string" and Enum.ResamplerMode[binding.resampleMode]), string.format("Worker returned an invalid resampling mode for geometry asset %d", index))
+		assert(
+			type(binding.material) == "string" and Enum.Material[binding.material],
+			string.format("Worker returned an invalid material for geometry asset %d", index)
+		)
+		assert(
+			type(binding.materialVariant) == "string",
+			string.format("Worker returned an invalid material variant for geometry asset %d", index)
+		)
+		assert(
+			type(binding.doubleSided) == "boolean",
+			string.format("Worker returned invalid double-sided metadata for geometry asset %d", index)
+		)
+		assert(
+			type(binding.reflectance) == "number" and binding.reflectance >= 0 and binding.reflectance <= 1,
+			string.format("Worker returned invalid reflectance for geometry asset %d", index)
+		)
+		assert(
+			type(binding.hasMetalness) == "boolean" and type(binding.hasRoughness) == "boolean",
+			string.format("Worker returned invalid metallic or roughness metadata for geometry asset %d", index)
+		)
+		assert(
+			not binding.hasMetalness or binding.metallicRoughnessPage ~= nil,
+			string.format("Worker omitted the metalness page for geometry asset %d", index)
+		)
+		assert(
+			not binding.hasRoughness or binding.metallicRoughnessPage ~= nil,
+			string.format("Worker omitted the roughness page for geometry asset %d", index)
+		)
+		assert(
+			binding.alphaMode == nil or (type(binding.alphaMode) == "string" and Enum.AlphaMode[binding.alphaMode]),
+			string.format("Worker returned an invalid alpha mode for geometry asset %d", index)
+		)
+		assert(
+			binding.resampleMode == nil
+				or (type(binding.resampleMode) == "string" and Enum.ResamplerMode[binding.resampleMode]),
+			string.format("Worker returned an invalid resampling mode for geometry asset %d", index)
+		)
 		if binding.emissiveTint ~= nil then
-			assert(type(binding.emissiveTint) == "table" and #binding.emissiveTint == 3, string.format("Worker returned an invalid emissive tint for geometry asset %d", index))
+			assert(
+				type(binding.emissiveTint) == "table" and #binding.emissiveTint == 3,
+				string.format("Worker returned an invalid emissive tint for geometry asset %d", index)
+			)
 			for _, component in binding.emissiveTint do
-				assert(type(component) == "number" and component >= 0 and component <= 1, string.format("Worker returned an invalid emissive tint for geometry asset %d", index))
+				assert(
+					type(component) == "number" and component >= 0 and component <= 1,
+					string.format("Worker returned an invalid emissive tint for geometry asset %d", index)
+				)
 			end
 		end
-		assert(binding.emissiveStrength == nil or (type(binding.emissiveStrength) == "number" and binding.emissiveStrength >= 0), string.format("Worker returned an invalid emissive strength for geometry asset %d", index))
+		assert(
+			binding.emissiveStrength == nil
+				or (type(binding.emissiveStrength) == "number" and binding.emissiveStrength >= 0),
+			string.format("Worker returned an invalid emissive strength for geometry asset %d", index)
+		)
 		local sourceNames = assetSources[index]
-		assert(type(sourceNames) == "table" and #sourceNames > 0, string.format("Worker omitted source assignments for geometry asset %d", index))
+		assert(
+			type(sourceNames) == "table" and #sourceNames > 0,
+			string.format("Worker omitted source assignments for geometry asset %d", index)
+		)
 		local seenSources = {}
 		for _, sourceName in sourceNames do
-			assert(type(sourceName) == "string" and sourceName ~= "", string.format("Worker returned an invalid source assignment for geometry asset %d", index))
-			assert(not seenSources[sourceName], string.format("Worker returned a duplicate source assignment for geometry asset %d", index))
+			assert(
+				type(sourceName) == "string" and sourceName ~= "",
+				string.format("Worker returned an invalid source assignment for geometry asset %d", index)
+			)
+			assert(
+				not seenSources[sourceName],
+				string.format("Worker returned a duplicate source assignment for geometry asset %d", index)
+			)
 			seenSources[sourceName] = true
 		end
 		local texturePage
-		for _, page in {
-			binding.baseColorPage,
-			binding.metallicRoughnessPage,
-			binding.normalPage,
-			binding.emissivePage,
-		} do
+		for _, page in
+			{
+				binding.baseColorPage,
+				binding.metallicRoughnessPage,
+				binding.normalPage,
+				binding.emissivePage,
+			}
+		do
 			if page ~= nil then
-				assert(type(page) == "number" and page >= 0 and page % 1 == 0, "Worker returned an invalid material texture page")
-				assert(texturePage == nil or texturePage == page, "Worker returned unsynchronized material texture pages")
+				assert(
+					type(page) == "number" and page >= 0 and page % 1 == 0,
+					"Worker returned an invalid material texture page"
+				)
+				assert(
+					texturePage == nil or texturePage == page,
+					"Worker returned unsynchronized material texture pages"
+				)
 				texturePage = page
 			end
 		end
@@ -427,7 +513,9 @@ local function loadOutputUnsafe(assetIds, assetMaterials, assetSources, textureA
 	local importedModels = {}
 	for batchStart = 1, #assetIds, 5 do
 		local batchEnd = math.min(batchStart + 4, #assetIds)
-		setStatus(string.format("Importing geometry assets %d-%d of %d (up to 5 at once).", batchStart, batchEnd, #assetIds))
+		setStatus(
+			string.format("Importing geometry assets %d-%d of %d (up to 5 at once).", batchStart, batchEnd, #assetIds)
+		)
 		local batchResults = {}
 		local completed = 0
 		for index = batchStart, batchEnd do
@@ -449,10 +537,20 @@ local function loadOutputUnsafe(assetIds, assetMaterials, assetSources, textureA
 							or string.find(normalized, "too many requests", 1, true)
 							or string.find(normalized, "throttl", 1, true)
 						if rateLimited then
-							setStatus("Roblox asset import rate limit reached. Waiting 60 seconds before retrying asset " .. assetId .. ".")
+							setStatus(
+								"Roblox asset import rate limit reached. Waiting 60 seconds before retrying asset "
+									.. assetId
+									.. "."
+							)
 							for remaining = 60, 1, -1 do
 								if remaining % 10 == 0 or remaining <= 5 then
-									setStatus("Roblox asset import rate limit reached. Retrying asset " .. assetId .. " in " .. remaining .. " seconds.")
+									setStatus(
+										"Roblox asset import rate limit reached. Retrying asset "
+											.. assetId
+											.. " in "
+											.. remaining
+											.. " seconds."
+									)
 								end
 								task.wait(1)
 							end
@@ -478,7 +576,10 @@ local function loadOutputUnsafe(assetIds, assetMaterials, assetSources, textureA
 				if model then
 					model:Destroy()
 				end
-				table.insert(failures, string.format("%s: %s", assetIds[index], result.error or "Roblox did not return a Model asset"))
+				table.insert(
+					failures,
+					string.format("%s: %s", assetIds[index], result.error or "Roblox did not return a Model asset")
+				)
 			end
 		end
 		assert(#failures == 0, "Could not import geometry asset(s): " .. table.concat(failures, "; "))
@@ -501,7 +602,10 @@ local function loadOutputUnsafe(assetIds, assetMaterials, assetSources, textureA
 					descendant.MaterialVariant = materialBinding.materialVariant or ""
 					descendant.DoubleSided = materialBinding.doubleSided
 					descendant.Reflectance = materialBinding.reflectance or 0
-					local texturePage = materialBinding.baseColorPage or materialBinding.metallicRoughnessPage or materialBinding.normalPage or materialBinding.emissivePage
+					local texturePage = materialBinding.baseColorPage
+						or materialBinding.metallicRoughnessPage
+						or materialBinding.normalPage
+						or materialBinding.emissivePage
 					local maps = texturePage and textureAssetsByPage[texturePage]
 					if maps then
 						local appearance = Instance.new("SurfaceAppearance")
@@ -591,13 +695,25 @@ local function loadGeometryOutput(geometryAssets, assetMaterials, assetSources, 
 					boundsMax[axis] = math.max(boundsMax[axis], position[axis])
 				end
 			end
-			local origin = Vector3.new((boundsMin[1] + boundsMax[1]) * 0.5, (boundsMin[2] + boundsMax[2]) * 0.5, (boundsMin[3] + boundsMax[3]) * 0.5)
+			local origin = Vector3.new(
+				(boundsMin[1] + boundsMax[1]) * 0.5,
+				(boundsMin[2] + boundsMax[2]) * 0.5,
+				(boundsMin[3] + boundsMax[3]) * 0.5
+			)
 			for _, position in geometry.positions do
 				position[1] -= origin.X
 				position[2] -= origin.Y
 				position[3] -= origin.Z
 			end
-			print(string.format("[PA Combine] Starting Studio geometry asset %d/%d (%d vertices, %d triangles)", index, totalAssets, #geometry.positions, #geometry.indices / 3))
+			print(
+				string.format(
+					"[PA Combine] Starting Studio geometry asset %d/%d (%d vertices, %d triangles)",
+					index,
+					totalAssets,
+					#geometry.positions,
+					#geometry.indices / 3
+				)
+			)
 			task.spawn(function()
 				local editableMesh
 				local model
@@ -609,7 +725,8 @@ local function loadGeometryOutput(geometryAssets, assetMaterials, assetSources, 
 					local uvIds = table.create(#geometry.uvs)
 					local colorIds = table.create(#geometry.colors)
 					for vertexIndex, position in geometry.positions do
-						vertexIds[vertexIndex] = editableMesh:AddVertex(Vector3.new(position[1], position[2], position[3]))
+						vertexIds[vertexIndex] =
+							editableMesh:AddVertex(Vector3.new(position[1], position[2], position[3]))
 					end
 					for vertexIndex, normal in geometry.normals do
 						normalIds[vertexIndex] = editableMesh:AddNormal(Vector3.new(normal[1], normal[2], normal[3]))
@@ -618,7 +735,8 @@ local function loadGeometryOutput(geometryAssets, assetMaterials, assetSources, 
 						uvIds[vertexIndex] = editableMesh:AddUV(Vector2.new(uv[1], uv[2]))
 					end
 					for vertexIndex, color in geometry.colors do
-						colorIds[vertexIndex] = editableMesh:AddColor(Color3.new(color[1], color[2], color[3]), color[4])
+						colorIds[vertexIndex] =
+							editableMesh:AddColor(Color3.new(color[1], color[2], color[3]), color[4])
 					end
 					for indexOffset = 1, #geometry.indices, 3 do
 						local first = geometry.indices[indexOffset] + 1
@@ -629,8 +747,16 @@ local function loadGeometryOutput(geometryAssets, assetMaterials, assetSources, 
 						editableMesh:SetFaceUVs(faceId, { uvIds[first], uvIds[second], uvIds[third] })
 						editableMesh:SetFaceColors(faceId, { colorIds[first], colorIds[second], colorIds[third] })
 					end
-					print(string.format("[PA Combine] EditableMesh %d populated: %d vertices, %d triangles; publishing asset", index, #geometry.positions, #geometry.indices / 3))
-					local creatorType = game.CreatorType == Enum.CreatorType.Group and Enum.AssetCreatorType.Group or Enum.AssetCreatorType.User
+					print(
+						string.format(
+							"[PA Combine] EditableMesh %d populated: %d vertices, %d triangles; publishing asset",
+							index,
+							#geometry.positions,
+							#geometry.indices / 3
+						)
+					)
+					local creatorType = game.CreatorType == Enum.CreatorType.Group and Enum.AssetCreatorType.Group
+						or Enum.AssetCreatorType.User
 					local status, assetId = AssetService:CreateAssetAsync(editableMesh, Enum.AssetType.Mesh, {
 						Name = string.format("PA Combine Output %d", index),
 						Description = "Combined geometry generated by PA Combine.",
@@ -638,7 +764,9 @@ local function loadGeometryOutput(geometryAssets, assetMaterials, assetSources, 
 						CreatorType = creatorType,
 					})
 					assert(status == Enum.CreateAssetResult.Success, tostring(assetId or status))
-					print(string.format("[PA Combine] Studio geometry asset %d published as %s", index, tostring(assetId)))
+					print(
+						string.format("[PA Combine] Studio geometry asset %d published as %s", index, tostring(assetId))
+					)
 					editableMesh:Destroy()
 					editableMesh = nil
 					local meshPart = AssetService:CreateMeshPartAsync(Content.fromAssetId(assetId), {
@@ -667,13 +795,19 @@ local function loadGeometryOutput(geometryAssets, assetMaterials, assetSources, 
 					meshPart.CastShadow = binding.castShadow
 					print(string.format("[PA Combine] Studio geometry asset %d created as MeshPart", index))
 					meshPart.Reflectance = binding.reflectance or 0
-					local texturePage = binding.baseColorPage or binding.metallicRoughnessPage or binding.normalPage or binding.emissivePage
+					local texturePage = binding.baseColorPage
+						or binding.metallicRoughnessPage
+						or binding.normalPage
+						or binding.emissivePage
 					local maps = texturePage and textureAssetsByPage[texturePage]
 					if maps then
 						local appearance = Instance.new("SurfaceAppearance")
 						local function setMap(property, slot)
 							local textureAssetId = maps[slot]
-							assert(textureAssetId, string.format("Worker omitted the %s map for page %d", slot, texturePage))
+							assert(
+								textureAssetId,
+								string.format("Worker omitted the %s map for page %d", slot, texturePage)
+							)
 							appearance[property] = Content.fromAssetId(tonumber(textureAssetId))
 						end
 						if binding.baseColorPage then
@@ -712,13 +846,15 @@ local function loadGeometryOutput(geometryAssets, assetMaterials, assetSources, 
 				if not ok then
 					warn(string.format("[PA Combine] EditableMesh %d failed: %s", index, tostring(result)))
 				end
-		end)
+			end)
 		end
 		while completed < batchEnd do
 			task.wait()
 		end
 	end
-	print(string.format("[PA Combine] Studio geometry asset creation finished: %d/%d completed", completed, totalAssets))
+	print(
+		string.format("[PA Combine] Studio geometry asset creation finished: %d/%d completed", completed, totalAssets)
+	)
 	local failures = {}
 	for index, result in results do
 		if not result.ok then
@@ -749,7 +885,8 @@ end
 
 local function loadOutput(assetIds, assetMaterials, assetSources, textureAssets)
 	local models = {}
-	local ok, result, meshParts, sourceAssignments, meshPartSources = pcall(loadOutputUnsafe, assetIds, assetMaterials, assetSources, textureAssets, models)
+	local ok, result, meshParts, sourceAssignments, meshPartSources =
+		pcall(loadOutputUnsafe, assetIds, assetMaterials, assetSources, textureAssets, models)
 	if not ok then
 		for _, model in models do
 			model.Parent = nil
@@ -820,7 +957,10 @@ local function getSourceTargets(source, sourceAssignments, identity)
 	local assigned = sourceAssignments[identity]
 	assert(assigned and #assigned > 0, string.format("No output geometry was assigned to source %s", source.Name))
 	for _, target in assigned do
-		assert(target and target:IsA("MeshPart"), string.format("Source %s has an invalid output geometry assignment", source.Name))
+		assert(
+			target and target:IsA("MeshPart"),
+			string.format("Source %s has an invalid output geometry assignment", source.Name)
+		)
 	end
 	return assigned
 end
@@ -971,10 +1111,69 @@ local function applyMergedProperties(sourceTargets, sourceAssemblyAnchored)
 end
 
 local appearanceProperties = {
-	SurfaceAppearance = { "TexturePackContent", "ColorMapContent", "MetalnessMapContent", "NormalMapContent", "RoughnessMapContent", "EmissiveMaskContent", "EmissiveTint", "EmissiveStrength", "AlphaMode", "Color", "ResampleMode" },
-	MaterialVariant = { "BaseMaterial", "CustomPhysicalProperties", "StudsPerTile", "MaterialPattern", "ColorMapContent", "MetalnessMapContent", "NormalMapContent", "RoughnessMapContent", "EmissiveMaskContent", "EmissiveTint", "EmissiveStrength", "AlphaMode" },
-	Decal = { "Texture", "ColorMapContent", "MetalnessMapContent", "NormalMapContent", "RoughnessMapContent", "EmissiveMaskContent", "EmissiveTint", "EmissiveStrength", "Color3", "Transparency", "LocalTransparencyModifier", "Rotation", "Face", "ZIndex" },
-	Texture = { "Texture", "ColorMapContent", "MetalnessMapContent", "NormalMapContent", "RoughnessMapContent", "EmissiveMaskContent", "EmissiveTint", "EmissiveStrength", "Color3", "Transparency", "LocalTransparencyModifier", "Rotation", "Face", "StudsPerTileU", "StudsPerTileV", "OffsetStudsU", "OffsetStudsV", "ZIndex" },
+	SurfaceAppearance = {
+		"TexturePackContent",
+		"ColorMapContent",
+		"MetalnessMapContent",
+		"NormalMapContent",
+		"RoughnessMapContent",
+		"EmissiveMaskContent",
+		"EmissiveTint",
+		"EmissiveStrength",
+		"AlphaMode",
+		"Color",
+		"ResampleMode",
+	},
+	MaterialVariant = {
+		"BaseMaterial",
+		"CustomPhysicalProperties",
+		"StudsPerTile",
+		"MaterialPattern",
+		"ColorMapContent",
+		"MetalnessMapContent",
+		"NormalMapContent",
+		"RoughnessMapContent",
+		"EmissiveMaskContent",
+		"EmissiveTint",
+		"EmissiveStrength",
+		"AlphaMode",
+	},
+	Decal = {
+		"Texture",
+		"ColorMapContent",
+		"MetalnessMapContent",
+		"NormalMapContent",
+		"RoughnessMapContent",
+		"EmissiveMaskContent",
+		"EmissiveTint",
+		"EmissiveStrength",
+		"Color3",
+		"Transparency",
+		"LocalTransparencyModifier",
+		"Rotation",
+		"Face",
+		"ZIndex",
+	},
+	Texture = {
+		"Texture",
+		"ColorMapContent",
+		"MetalnessMapContent",
+		"NormalMapContent",
+		"RoughnessMapContent",
+		"EmissiveMaskContent",
+		"EmissiveTint",
+		"EmissiveStrength",
+		"Color3",
+		"Transparency",
+		"LocalTransparencyModifier",
+		"Rotation",
+		"Face",
+		"StudsPerTileU",
+		"StudsPerTileV",
+		"OffsetStudsU",
+		"OffsetStudsV",
+		"ZIndex",
+	},
 }
 
 local function captureAppearanceStates(roots)
@@ -1028,7 +1227,10 @@ end
 
 local function validateAppearanceStates(snapshot)
 	local current = captureAppearanceStates(snapshot.roots)
-	assert(#current == #snapshot.appearanceStates, "Texture, overlay, or material instances were added or removed while baking")
+	assert(
+		#current == #snapshot.appearanceStates,
+		"Texture, overlay, or material instances were added or removed while baking"
+	)
 	local expected = {}
 	for _, state in snapshot.appearanceStates do
 		expected[state.instance] = state
@@ -1036,12 +1238,21 @@ local function validateAppearanceStates(snapshot)
 	for _, state in current do
 		local previous = expected[state.instance]
 		assert(previous, string.format("Appearance instance %s was added while baking", state.instance:GetFullName()))
-		assert(state.parent == previous.parent and state.className == previous.className, string.format("Appearance instance %s was moved or replaced while baking", state.instance.Name))
+		assert(
+			state.parent == previous.parent and state.className == previous.className,
+			string.format("Appearance instance %s was moved or replaced while baking", state.instance.Name)
+		)
 		for property, value in previous.properties do
-			assert(value == state.properties[property], string.format("%s.%s changed while baking", state.instance:GetFullName(), property))
+			assert(
+				value == state.properties[property],
+				string.format("%s.%s changed while baking", state.instance:GetFullName(), property)
+			)
 		end
 		for property, value in state.properties do
-			assert(value == previous.properties[property], string.format("%s.%s changed while baking", state.instance:GetFullName(), property))
+			assert(
+				value == previous.properties[property],
+				string.format("%s.%s changed while baking", state.instance:GetFullName(), property)
+			)
 		end
 	end
 end
@@ -1061,11 +1272,20 @@ local function validateHierarchyStates(snapshot)
 	local current = {}
 	for _, root in snapshot.roots do
 		current[root] = true
-		assert(snapshot.hierarchyStates[root] == root.Parent, string.format("Selected root %s was moved while baking", root.Name))
+		assert(
+			snapshot.hierarchyStates[root] == root.Parent,
+			string.format("Selected root %s was moved while baking", root.Name)
+		)
 		for _, descendant in root:GetDescendants() do
 			current[descendant] = true
-			assert(snapshot.hierarchyStates[descendant] ~= nil, string.format("Instance %s was added while baking", descendant.Name))
-			assert(snapshot.hierarchyStates[descendant] == descendant.Parent, string.format("Instance %s was moved while baking", descendant.Name))
+			assert(
+				snapshot.hierarchyStates[descendant] ~= nil,
+				string.format("Instance %s was added while baking", descendant.Name)
+			)
+			assert(
+				snapshot.hierarchyStates[descendant] == descendant.Parent,
+				string.format("Instance %s was moved while baking", descendant.Name)
+			)
 		end
 	end
 	for instance in snapshot.hierarchyStates do
@@ -1149,10 +1369,11 @@ local function captureReplacementState(snapshot, models, meshParts)
 		elseif instance:IsA("ObjectValue") and sources[instance.Value] then
 			state.objectValues[instance] = instance.Value
 		elseif instance:IsA("Model") and sources[instance.PrimaryPart] then
-			state.models[instance] = state.models[instance] or {
-				pivot = instance:GetPivot(),
-				primaryPart = instance.PrimaryPart,
-			}
+			state.models[instance] = state.models[instance]
+				or {
+					pivot = instance:GetPivot(),
+					primaryPart = instance.PrimaryPart,
+				}
 		end
 	end
 	return state
@@ -1200,24 +1421,79 @@ local function replaceSelection(snapshot, models, meshParts, sourceAssignments, 
 	validateHierarchyStates(snapshot)
 	for _, sourceState in snapshot.sourceStates do
 		local source = sourceState.instance
-		assert(source.Parent == sourceState.parent, string.format("Source %s was moved or removed while baking", source.Name))
-		assert(source.CFrame == sourceState.cframe and source.Size == sourceState.size, string.format("Source %s changed while baking", source.Name))
-		assert(source.Transparency == sourceState.transparency and source.LocalTransparencyModifier == sourceState.localTransparencyModifier, string.format("Source %s visibility changed while baking", source.Name))
-		assert(source.Color == sourceState.color and source.Reflectance == sourceState.reflectance, string.format("Source %s appearance changed while baking", source.Name))
-		assert(source.Material == sourceState.material and source.MaterialVariant == sourceState.materialVariant, string.format("Source %s material changed while baking", source.Name))
-		assert(source.Anchored == sourceState.anchored, string.format("Source %s anchoring changed while baking", source.Name))
-		assert(source.CollisionGroup == sourceState.collisionGroup and source.CustomPhysicalProperties == sourceState.customPhysicalProperties, string.format("Source %s collision properties changed while baking", source.Name))
-		assert(source.CanCollide == sourceState.canCollide and source.CanTouch == sourceState.canTouch and source.CanQuery == sourceState.canQuery, string.format("Source %s collision or interaction flags changed while baking", source.Name))
-		assert(source.Massless == sourceState.massless and source.CastShadow == sourceState.castShadow, string.format("Source %s physics or rendering properties changed while baking", source.Name))
-		assert(dictionariesMatch(source:GetAttributes(), sourceState.attributes), string.format("Source %s attributes changed while baking", source.Name))
-		assert(dictionariesMatch(getTagSet(source), sourceState.tags), string.format("Source %s tags changed while baking", source.Name))
+		assert(
+			source.Parent == sourceState.parent,
+			string.format("Source %s was moved or removed while baking", source.Name)
+		)
+		assert(
+			source.CFrame == sourceState.cframe and source.Size == sourceState.size,
+			string.format("Source %s changed while baking", source.Name)
+		)
+		assert(
+			source.Transparency == sourceState.transparency
+				and source.LocalTransparencyModifier == sourceState.localTransparencyModifier,
+			string.format("Source %s visibility changed while baking", source.Name)
+		)
+		assert(
+			source.Color == sourceState.color and source.Reflectance == sourceState.reflectance,
+			string.format("Source %s appearance changed while baking", source.Name)
+		)
+		assert(
+			source.Material == sourceState.material and source.MaterialVariant == sourceState.materialVariant,
+			string.format("Source %s material changed while baking", source.Name)
+		)
+		assert(
+			source.Anchored == sourceState.anchored,
+			string.format("Source %s anchoring changed while baking", source.Name)
+		)
+		assert(
+			source.CollisionGroup == sourceState.collisionGroup
+				and source.CustomPhysicalProperties == sourceState.customPhysicalProperties,
+			string.format("Source %s collision properties changed while baking", source.Name)
+		)
+		assert(
+			source.CanCollide == sourceState.canCollide
+				and source.CanTouch == sourceState.canTouch
+				and source.CanQuery == sourceState.canQuery,
+			string.format("Source %s collision or interaction flags changed while baking", source.Name)
+		)
+		assert(
+			source.Massless == sourceState.massless and source.CastShadow == sourceState.castShadow,
+			string.format("Source %s physics or rendering properties changed while baking", source.Name)
+		)
+		assert(
+			dictionariesMatch(source:GetAttributes(), sourceState.attributes),
+			string.format("Source %s attributes changed while baking", source.Name)
+		)
+		assert(
+			dictionariesMatch(getTagSet(source), sourceState.tags),
+			string.format("Source %s tags changed while baking", source.Name)
+		)
 		if source:IsA("MeshPart") then
-			assert(source.MeshContent == sourceState.meshContent and source.TextureContent == sourceState.textureContent and source.DoubleSided == sourceState.doubleSided, string.format("Source %s mesh or texture changed while baking", source.Name))
-			assert(source.CollisionFidelity == sourceState.meshCollisionFidelity and source.CollisionPrecision == sourceState.collisionPrecision and source.RenderFidelity == sourceState.meshRenderFidelity, string.format("Source %s mesh fidelity changed while baking", source.Name))
+			assert(
+				source.MeshContent == sourceState.meshContent
+					and source.TextureContent == sourceState.textureContent
+					and source.DoubleSided == sourceState.doubleSided,
+				string.format("Source %s mesh or texture changed while baking", source.Name)
+			)
+			assert(
+				source.CollisionFidelity == sourceState.meshCollisionFidelity
+					and source.CollisionPrecision == sourceState.collisionPrecision
+					and source.RenderFidelity == sourceState.meshRenderFidelity,
+				string.format("Source %s mesh fidelity changed while baking", source.Name)
+			)
 		elseif source:IsA("Part") then
-			assert(source.Shape == sourceState.shape, string.format("Source %s shape changed while baking", source.Name))
+			assert(
+				source.Shape == sourceState.shape,
+				string.format("Source %s shape changed while baking", source.Name)
+			)
 		elseif source:IsA("UnionOperation") then
-			assert(source.CollisionFidelity == sourceState.collisionFidelity and source.RenderFidelity == sourceState.renderFidelity and source.FluidFidelity == sourceState.fluidFidelity, string.format("Source %s union fidelity changed while baking", source.Name))
+			assert(
+				source.CollisionFidelity == sourceState.collisionFidelity
+					and source.RenderFidelity == sourceState.renderFidelity
+					and source.FluidFidelity == sourceState.fluidFidelity,
+				string.format("Source %s union fidelity changed while baking", source.Name)
+			)
 		end
 	end
 	local roots = snapshot.roots
@@ -1231,8 +1507,14 @@ local function replaceSelection(snapshot, models, meshParts, sourceAssignments, 
 		local assigned = getSourceTargets(source, sourceAssignments, identity)
 		local seenTargets = {}
 		for _, target in assigned do
-			assert(meshPartSet[target], string.format("Source %s maps to geometry outside the uploaded output", source.Name))
-			assert(not seenTargets[target], string.format("Source %s has a duplicate output geometry assignment", source.Name))
+			assert(
+				meshPartSet[target],
+				string.format("Source %s maps to geometry outside the uploaded output", source.Name)
+			)
+			assert(
+				not seenTargets[target],
+				string.format("Source %s has a duplicate output geometry assignment", source.Name)
+			)
 			seenTargets[target] = true
 			local names = reverseAssignments[target] or {}
 			names[identity] = true
@@ -1244,13 +1526,25 @@ local function replaceSelection(snapshot, models, meshParts, sourceAssignments, 
 		assert(sourceNames and #sourceNames > 0, "An uploaded MeshPart has no source identity")
 		local seenSources = {}
 		for _, sourceName in sourceNames do
-			assert(snapshot.identitySources[sourceName], string.format("Uploaded geometry references unknown source %s", sourceName))
-			assert(not seenSources[sourceName], string.format("Uploaded geometry repeats source identity %s", sourceName))
-			assert(reverseAssignments[meshPart] and reverseAssignments[meshPart][sourceName], string.format("Uploaded geometry has an inconsistent source assignment for %s", sourceName))
+			assert(
+				snapshot.identitySources[sourceName],
+				string.format("Uploaded geometry references unknown source %s", sourceName)
+			)
+			assert(
+				not seenSources[sourceName],
+				string.format("Uploaded geometry repeats source identity %s", sourceName)
+			)
+			assert(
+				reverseAssignments[meshPart] and reverseAssignments[meshPart][sourceName],
+				string.format("Uploaded geometry has an inconsistent source assignment for %s", sourceName)
+			)
 			seenSources[sourceName] = true
 		end
 		for sourceName in reverseAssignments[meshPart] or {} do
-			assert(seenSources[sourceName], string.format("Source assignment for %s is missing from uploaded geometry metadata", sourceName))
+			assert(
+				seenSources[sourceName],
+				string.format("Source assignment for %s is missing from uploaded geometry metadata", sourceName)
+			)
 		end
 	end
 	for meshPart in meshPartSources do
@@ -1290,7 +1584,10 @@ local function replaceSelection(snapshot, models, meshParts, sourceAssignments, 
 			else
 				meshPart.CollisionFidelity = Enum.CollisionFidelity.Tunable
 				meshPart.CollisionPrecision = 1
-				assert(meshPart.CollisionPrecision == 1, string.format("Could not set collision precision to 1 for %s", meshPart.Name))
+				assert(
+					meshPart.CollisionPrecision == 1,
+					string.format("Could not set collision precision to 1 for %s", meshPart.Name)
+				)
 			end
 		end
 		outputModel.Parent = commonParent
@@ -1308,7 +1605,13 @@ local function replaceSelection(snapshot, models, meshParts, sourceAssignments, 
 	if not succeeded then
 		local restored, restoreError = pcall(restoreReplacementState, replacementState)
 		if not restored then
-			error(string.format("Replacement failed: %s. Rollback also failed: %s", tostring(result), tostring(restoreError)))
+			error(
+				string.format(
+					"Replacement failed: %s. Rollback also failed: %s",
+					tostring(result),
+					tostring(restoreError)
+				)
+			)
 		end
 		error(result)
 	end
@@ -1316,11 +1619,13 @@ local function replaceSelection(snapshot, models, meshParts, sourceAssignments, 
 end
 
 local function getFirstProcessingError(response)
-	for _, errors in {
-		response.sourceErrors or {},
-		response.textureErrors or {},
-		response.overlayErrors or {},
-	} do
+	for _, errors in
+		{
+			response.sourceErrors or {},
+			response.textureErrors or {},
+			response.overlayErrors or {},
+		}
+	do
 		if #errors > 0 then
 			return string.format("%s: %s", errors[1].name, errors[1].error)
 		end
@@ -1370,7 +1675,13 @@ local function onMessage(message)
 	if response.event == "progress" then
 		local sequence = response.sequence
 		local stageOrder = progressStages[response.stage]
-		if requestState.state ~= "processing" or type(sequence) ~= "number" or sequence <= requestState.lastSequence or not stageOrder or stageOrder < requestState.stageOrder then
+		if
+			requestState.state ~= "processing"
+			or type(sequence) ~= "number"
+			or sequence <= requestState.lastSequence
+			or not stageOrder
+			or stageOrder < requestState.stageOrder
+		then
 			return
 		end
 		requestState.lastSequence = sequence
@@ -1381,7 +1692,8 @@ local function onMessage(message)
 		setStatus(response.message or response.stage or "Processing...")
 		return
 	end
-	local responseState = response.ok and "response_received" or (requestState.state == "cancelling" and "cancelled" or "failed")
+	local responseState = response.ok and "response_received"
+		or (requestState.state == "cancelling" and "cancelled" or "failed")
 	if not transitionRequest(responseState) then
 		return
 	end
@@ -1423,7 +1735,13 @@ local function onMessage(message)
 	if response.ok then
 		local assetIds = response.assetIds or (response.assetId and { response.assetId }) or {}
 		local geometryAssets = response.geometryAssets or {}
-		print(string.format("[PA Combine] worker response contains %d geometry asset(s), ok=%s", #geometryAssets, tostring(response.ok)))
+		print(
+			string.format(
+				"[PA Combine] worker response contains %d geometry asset(s), ok=%s",
+				#geometryAssets,
+				tostring(response.ok)
+			)
+		)
 		local outputAssetCount = #geometryAssets > 0 and #geometryAssets or #assetIds
 		if outputAssetCount > 0 then
 			local failure = response.error or getFirstProcessingError(response)
@@ -1434,34 +1752,67 @@ local function onMessage(message)
 			end
 			local loaded, models, meshParts, sourceAssignments, meshPartSources
 			if #geometryAssets > 0 then
-				loaded, models, meshParts, sourceAssignments, meshPartSources = pcall(loadGeometryOutput, geometryAssets, response.assetMaterials, response.assetSources, response.textureAssets)
+				loaded, models, meshParts, sourceAssignments, meshPartSources = pcall(
+					loadGeometryOutput,
+					geometryAssets,
+					response.assetMaterials,
+					response.assetSources,
+					response.textureAssets
+				)
 			else
-				loaded, models, meshParts, sourceAssignments, meshPartSources = pcall(loadOutput, assetIds, response.assetMaterials, response.assetSources, response.textureAssets)
+				loaded, models, meshParts, sourceAssignments, meshPartSources =
+					pcall(loadOutput, assetIds, response.assetMaterials, response.assetSources, response.textureAssets)
 			end
 			if not loaded then
-				finishRequest("failed", string.format("Uploaded %d asset(s) but could not load them: %s", outputAssetCount, tostring(models)), colors.bad)
+				finishRequest(
+					"failed",
+					string.format(
+						"Uploaded %d asset(s) but could not load them: %s",
+						outputAssetCount,
+						tostring(models)
+					),
+					colors.bad
+				)
 				return
 			end
 			if failure then
 				showPreview(models)
-				finishRequest("failed", string.format("Loaded %d uploaded asset(s) into Workspace.PA Combine Output. Replacement was skipped: %s", outputAssetCount, failure), colors.bad)
+				finishRequest(
+					"failed",
+					string.format(
+						"Loaded %d uploaded asset(s) into Workspace.PA Combine Output. Replacement was skipped: %s",
+						outputAssetCount,
+						failure
+					),
+					colors.bad
+				)
 				return
 			end
 			local recordingService = game:GetService("ChangeHistoryService")
 			local recordingId = string.format("PACombineBake_%d", pendingRequest)
-			local recordingStarted, recording = pcall(recordingService.TryBeginRecording, recordingService, recordingId, "Bake selected geometry")
+			local recordingStarted, recording =
+				pcall(recordingService.TryBeginRecording, recordingService, recordingId, "Bake selected geometry")
 			if not recordingStarted or not recording then
 				showPreview(models)
-				finishRequest("failed", "Studio could not begin an undo recording" .. (recordingStarted and "." or ": " .. tostring(recording)), colors.bad)
+				finishRequest(
+					"failed",
+					"Studio could not begin an undo recording"
+						.. (recordingStarted and "." or ": " .. tostring(recording)),
+					colors.bad
+				)
 				return
 			end
 			transitionRequest("replacing")
 			local replaced, meshPartCount, finalModel, replacementState = pcall(function()
-				local count, output, state = replaceSelection(pendingSelection, models, meshParts, sourceAssignments, meshPartSources)
+				local count, output, state =
+					replaceSelection(pendingSelection, models, meshParts, sourceAssignments, meshPartSources)
 				return count, output, state
 			end)
 			local finishCallSucceeded, finishError = pcall(function()
-				recordingService:FinishRecording(recording, replaced and Enum.FinishRecordingOperation.Commit or Enum.FinishRecordingOperation.Cancel)
+				recordingService:FinishRecording(
+					recording,
+					replaced and Enum.FinishRecordingOperation.Commit or Enum.FinishRecordingOperation.Cancel
+				)
 			end)
 			if not finishCallSucceeded then
 				finishError = tostring(finishError)
@@ -1469,49 +1820,122 @@ local function onMessage(message)
 			if not finishCallSucceeded and replaced then
 				local restored, restoreError = pcall(restoreReplacementState, replacementState)
 				if not restored then
-					finishError = tostring(finishError or "Studio rejected the recording operation") .. "; replacement rollback failed: " .. tostring(restoreError)
+					finishError = tostring(finishError or "Studio rejected the recording operation")
+						.. "; replacement rollback failed: "
+						.. tostring(restoreError)
 				end
 			end
 			if not replaced then
 				for _, model in models do
 					model.Parent = nil
 				end
-				local detail = string.format("Phase: replaceSelection\nRecording ID: %s\nReplacement error:\n%s\nFinishRecording call succeeded: %s\nFinishRecording error: %s", recordingId, tostring(meshPartCount), tostring(finishCallSucceeded), tostring(finishError))
+				local detail = string.format(
+					"Phase: replaceSelection\nRecording ID: %s\nReplacement error:\n%s\nFinishRecording call succeeded: %s\nFinishRecording error: %s",
+					recordingId,
+					tostring(meshPartCount),
+					tostring(finishCallSucceeded),
+					tostring(finishError)
+				)
 				setErrorDetails(detail)
-				finishRequest("failed", "Replacement failed before completion. Full error details are shown below.", colors.bad)
+				finishRequest(
+					"failed",
+					"Replacement failed before completion. Full error details are shown below.",
+					colors.bad
+				)
 				return
 			end
 			if not finishCallSucceeded then
-				local detail = string.format("Phase: FinishRecording %s\nRecording ID: %s\nReplacement completed: %s\nFinishRecording call succeeded: %s\nStudio error:\n%s", replaced and "commit" or "cancel", recordingId, tostring(replaced), tostring(finishCallSucceeded), tostring(finishError))
+				local detail = string.format(
+					"Phase: FinishRecording %s\nRecording ID: %s\nReplacement completed: %s\nFinishRecording call succeeded: %s\nStudio error:\n%s",
+					replaced and "commit" or "cancel",
+					recordingId,
+					tostring(replaced),
+					tostring(finishCallSucceeded),
+					tostring(finishError)
+				)
 				setErrorDetails(detail)
-				finishRequest("failed", "Studio could not finalize the replacement undo recording. Full diagnostic details are shown below.", colors.bad)
+				finishRequest(
+					"failed",
+					"Studio could not finalize the replacement undo recording. Full diagnostic details are shown below.",
+					colors.bad
+				)
 				return
 			end
 			Selection:Set({ finalModel })
-			finishRequest("complete", string.format("Baked %d MeshParts from %d uploaded asset(s). Use Studio Undo to restore the original selection.", meshPartCount, outputAssetCount), colors.ok)
+			finishRequest(
+				"complete",
+				string.format(
+					"Baked %d MeshParts from %d uploaded asset(s). Use Studio Undo to restore the original selection.",
+					meshPartCount,
+					outputAssetCount
+				),
+				colors.ok
+			)
 			return
 		end
 		local processingError = getFirstProcessingError(response)
 		if processingError then
-			finishRequest("failed", string.format("%s First issue: %s", response.message or "Geometry processing was incomplete.", processingError), colors.bad)
+			finishRequest(
+				"failed",
+				string.format(
+					"%s First issue: %s",
+					response.message or "Geometry processing was incomplete.",
+					processingError
+				),
+				colors.bad
+			)
 		else
-			finishRequest("complete", response.glbPath and string.format("%s GLB: %s (%d bytes)", response.message or "Geometry generated.", response.glbPath, response.glbBytes or 0) or response.message or "Worker request completed.", colors.ok)
+			finishRequest(
+				"complete",
+				response.glbPath
+						and string.format(
+							"%s GLB: %s (%d bytes)",
+							response.message or "Geometry generated.",
+							response.glbPath,
+							response.glbBytes or 0
+						)
+					or response.message
+					or "Worker request completed.",
+				colors.ok
+			)
 		end
 	else
 		local assetIds = response.assetIds or (response.assetId and { response.assetId }) or {}
 		if requestState.state == "cancelled" then
 			finishRequest("cancelled", response.error or "Bake cancelled.", colors.warn)
 		elseif #assetIds > 0 then
-			local loaded, models = pcall(loadOutput, assetIds, response.assetMaterials, response.assetSources, response.textureAssets)
+			local loaded, models =
+				pcall(loadOutput, assetIds, response.assetMaterials, response.assetSources, response.textureAssets)
 			if loaded then
 				showPreview(models)
-				finishRequest("failed", string.format("Bake stopped after uploading %d geometry asset(s). Partial output is in Workspace.PA Combine Output; the original selection was not changed. %s", #assetIds, response.error or "The worker did not complete the full output."), colors.bad)
+				finishRequest(
+					"failed",
+					string.format(
+						"Bake stopped after uploading %d geometry asset(s). Partial output is in Workspace.PA Combine Output; the original selection was not changed. %s",
+						#assetIds,
+						response.error or "The worker did not complete the full output."
+					),
+					colors.bad
+				)
 			else
-				finishRequest("failed", string.format("Bake stopped after uploading %d geometry asset(s), but the partial preview could not be loaded: %s", #assetIds, tostring(models)), colors.bad)
+				finishRequest(
+					"failed",
+					string.format(
+						"Bake stopped after uploading %d geometry asset(s), but the partial preview could not be loaded: %s",
+						#assetIds,
+						tostring(models)
+					),
+					colors.bad
+				)
 			end
 		else
 			local processingError = getFirstProcessingError(response)
-			finishRequest("failed", (response.error or "Worker request failed.") .. (processingError and " First issue: " .. processingError or ""), colors.bad)
+			finishRequest(
+				"failed",
+				(response.error or "Worker request failed.")
+					.. (processingError and " First issue: " .. processingError or ""),
+				colors.bad
+			)
 		end
 	end
 end
@@ -1686,12 +2110,17 @@ local function extractSurfaceOverlays(selected, sourceIdentity, sourceAssemblyId
 								normalUri = getContentUri(instance.NormalMapContent),
 								roughnessUri = getContentUri(instance.RoughnessMapContent),
 								emissiveUri = emissiveUri,
-								emissiveTint = emissiveUri and (function()
-									local ok, tint = pcall(function() return instance.EmissiveTint end)
-									return ok and typeof(tint) == "Color3" and { tint.R, tint.G, tint.B } or nil
-								end)(),
+								emissiveTint = emissiveUri
+									and (function()
+										local ok, tint = pcall(function()
+											return instance.EmissiveTint
+										end)
+										return ok and typeof(tint) == "Color3" and { tint.R, tint.G, tint.B } or nil
+									end)(),
 								emissiveStrength = emissiveUri and (function()
-									local ok, strength = pcall(function() return instance.EmissiveStrength end)
+									local ok, strength = pcall(function()
+										return instance.EmissiveStrength
+									end)
 									return ok and strength or nil
 								end)(),
 								face = instance.Face.Name,
@@ -1730,7 +2159,9 @@ local function extractTextureInputs(selected, sourceIdentity)
 	local seen = {}
 	local function applyAppearanceMetadata(input, owner, appearanceSource)
 		local ok, alphaMode, surfaceColor, resampleMode = pcall(function()
-			return appearanceSource.AlphaMode.Name, appearanceSource:IsA("SurfaceAppearance") and appearanceSource.Color or nil, appearanceSource:IsA("SurfaceAppearance") and appearanceSource.ResampleMode.Name or nil
+			return appearanceSource.AlphaMode.Name,
+				appearanceSource:IsA("SurfaceAppearance") and appearanceSource.Color or nil,
+				appearanceSource:IsA("SurfaceAppearance") and appearanceSource.ResampleMode.Name or nil
 		end)
 		if not ok then
 			alphaMode = appearanceSource:IsA("MaterialVariant") and "Opaque" or "Overlay"
@@ -1743,7 +2174,14 @@ local function extractTextureInputs(selected, sourceIdentity)
 		end
 		input.alphaMode = alphaMode
 		local partColor = owner.Color
-		local tint = surfaceColor or (appearanceSource:IsA("MaterialVariant") and alphaMode ~= "Opaque" and alphaMode ~= "Overlay" and partColor or nil)
+		local tint = surfaceColor
+			or (
+				appearanceSource:IsA("MaterialVariant")
+					and alphaMode ~= "Opaque"
+					and alphaMode ~= "Overlay"
+					and partColor
+				or nil
+			)
 		input.surfaceColor = tint and { tint.R, tint.G, tint.B } or nil
 		input.baseColor = { partColor.R, partColor.G, partColor.B }
 		input.partColorBaked = appearanceSource:IsA("MaterialVariant") and alphaMode ~= "Opaque"
@@ -1794,7 +2232,8 @@ local function extractTextureInputs(selected, sourceIdentity)
 								add(instance, "color", variant.ColorMapContent, variant)
 							end
 							for _, slot in { "metalness", "normal", "roughness", "emissive" } do
-								local property = slot == "emissive" and "EmissiveMaskContent" or string.upper(string.sub(slot, 1, 1)) .. string.sub(slot, 2) .. "MapContent"
+								local property = slot == "emissive" and "EmissiveMaskContent"
+									or string.upper(string.sub(slot, 1, 1)) .. string.sub(slot, 2) .. "MapContent"
 								add(instance, slot, variant[property], variant)
 							end
 						end
@@ -1913,11 +2352,17 @@ end
 local function extractUnion(union)
 	local ok, result = pcall(function()
 		local serialized = SerializationService:SerializeInstancesAsync({ union })
-		assert(typeof(serialized) == "buffer", string.format("SerializationService returned %s instead of a buffer", typeof(serialized)))
+		assert(
+			typeof(serialized) == "buffer",
+			string.format("SerializationService returned %s instead of a buffer", typeof(serialized))
+		)
 		local serializedLength = buffer.len(serialized)
 		assert(serializedLength > 0, "SerializationService returned an empty buffer")
 		local encoded = EncodingService:Base64Encode(serialized)
-		assert(typeof(encoded) == "buffer", string.format("EncodingService returned %s instead of a buffer", typeof(encoded)))
+		assert(
+			typeof(encoded) == "buffer",
+			string.format("EncodingService returned %s instead of a buffer", typeof(encoded))
+		)
 		local encodedString = buffer.tostring(encoded)
 		assert(#encodedString > 0, "Base64 encoding returned an empty string")
 		return {
@@ -2019,7 +2464,10 @@ inspectButton.Activated:Connect(function()
 					for _, child in children do
 						if not (child:IsA("Decal") or child:IsA("Texture")) then
 							hasOnlyOverlayChildren = false
-						elseif child.Transparency < 1 and (getContentUri(child.ColorMapContent) or getContentUri(child.Texture)) then
+						elseif
+							child.Transparency < 1
+							and (getContentUri(child.ColorMapContent) or getContentUri(child.Texture))
+						then
 							hasVisibleOverlay = true
 						end
 					end
@@ -2033,7 +2481,13 @@ inspectButton.Activated:Connect(function()
 					and hasOnlyOverlayChildren
 					and hasVisibleOverlay
 					and not excludedTransparentOverlay
-				if candidate:IsA("BasePart") and ((candidate.Transparency < 1 and candidate.LocalTransparencyModifier < 1) or bakeTransparentOverlay) then
+				if
+					candidate:IsA("BasePart")
+					and (
+						(candidate.Transparency < 1 and candidate.LocalTransparencyModifier < 1)
+						or bakeTransparentOverlay
+					)
+				then
 					if candidate:IsA("UnionOperation") then
 						table.insert(unions, candidate)
 						table.insert(geometrySources, candidate)
@@ -2056,13 +2510,26 @@ inspectButton.Activated:Connect(function()
 	end
 	if #unsupportedGeometry > 0 then
 		local unsupported = unsupportedGeometry[1]
-		setStatus(string.format("Unsupported BasePart class %s: %s. No geometry was replaced.", unsupported.ClassName, unsupported:GetFullName()), colors.bad)
+		setStatus(
+			string.format(
+				"Unsupported BasePart class %s: %s. No geometry was replaced.",
+				unsupported.ClassName,
+				unsupported:GetFullName()
+			),
+			colors.bad
+		)
 		return
 	end
 	for _, source in geometrySources do
 		local appearance = source:FindFirstChildOfClass("SurfaceAppearance")
 		if appearance and getContentUri(appearance.TexturePackContent) then
-			setStatus(string.format("SurfaceAppearance texture packs are not supported yet: %s. No geometry was replaced.", source:GetFullName()), colors.bad)
+			setStatus(
+				string.format(
+					"SurfaceAppearance texture packs are not supported yet: %s. No geometry was replaced.",
+					source:GetFullName()
+				),
+				colors.bad
+			)
 			return
 		end
 	end
@@ -2110,7 +2577,8 @@ inspectButton.Activated:Connect(function()
 		local meshInputs = {}
 		for index, meshPart in meshParts do
 			setStatus(string.format("Extracting MeshPart %d of %d: %s", index, #meshParts, meshPart.Name))
-			local ok, extracted = pcall(extractMeshPart, meshPart, sourceIdentity[meshPart], sourceAssemblyIdentity[meshPart])
+			local ok, extracted =
+				pcall(extractMeshPart, meshPart, sourceIdentity[meshPart], sourceAssemblyIdentity[meshPart])
 			if not ok then
 				setStatus(tostring(extracted), colors.bad)
 				return
@@ -2176,12 +2644,14 @@ inspectButton.Activated:Connect(function()
 				surfaceColor = if composite then overlay.color else nil,
 				baseColor = if composite then overlay.baseColor else nil,
 			})
-			for _, map in {
-				{ slot = "metalness", uri = overlay.metalnessUri },
-				{ slot = "normal", uri = overlay.normalUri },
-				{ slot = "roughness", uri = overlay.roughnessUri },
-				{ slot = "emissive", uri = overlay.emissiveUri },
-			} do
+			for _, map in
+				{
+					{ slot = "metalness", uri = overlay.metalnessUri },
+					{ slot = "normal", uri = overlay.normalUri },
+					{ slot = "roughness", uri = overlay.roughnessUri },
+					{ slot = "emissive", uri = overlay.emissiveUri },
+				}
+			do
 				if map.uri then
 					table.insert(textureInputs, {
 						name = overlay.name,
@@ -2191,9 +2661,25 @@ inspectButton.Activated:Connect(function()
 				end
 			end
 		end
-		print(string.format("[PA Combine] extracted %d MeshPart(s), %d union(s), %d primitive(s), %d texture input(s), and %d surface overlay(s)", #meshInputs, #unionInputs, #primitiveInputs, #textureInputs, #surfaceOverlays))
+		print(
+			string.format(
+				"[PA Combine] extracted %d MeshPart(s), %d union(s), %d primitive(s), %d texture input(s), and %d surface overlay(s)",
+				#meshInputs,
+				#unionInputs,
+				#primitiveInputs,
+				#textureInputs,
+				#surfaceOverlays
+			)
+		)
 		for _, input in unionInputs do
-			print(string.format("[PA Combine] union %s serialized to %d bytes (%d base64 bytes)", input.name, input.serializedBytes, input.encodedBytes))
+			print(
+				string.format(
+					"[PA Combine] union %s serialized to %d bytes (%d base64 bytes)",
+					input.name,
+					input.serializedBytes,
+					input.encodedBytes
+				)
+			)
 		end
 		local identitySources = {}
 		for source, identity in sourceIdentity do

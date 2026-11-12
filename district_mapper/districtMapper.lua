@@ -29,11 +29,20 @@ local COLORS = {
 }
 
 local toolbar = shared.paTools
-while not (toolbar and toolbar.ready and type(toolbar.addButton) == "function" and type(toolbar.setButtonHandler) == "function" and type(toolbar.removeButtonHandler) == "function") do
+while
+	not (
+		toolbar
+		and toolbar.ready
+		and type(toolbar.addButton) == "function"
+		and type(toolbar.setButtonHandler) == "function"
+		and type(toolbar.removeButtonHandler) == "function"
+	)
+do
 	task.wait()
 	toolbar = shared.paTools
 end
-local toggleButton = toolbar.addButton("districtMapper", "Create and extrude district outlines", "rbxassetid://4458901886")
+local toggleButton =
+	toolbar.addButton("districtMapper", "Create and extrude district outlines", "rbxassetid://4458901886")
 
 local widgetInfo = DockWidgetPluginGuiInfo.new(Enum.InitialDockState.Right, true, false, 300, 520, 260, 360)
 local widget = plugin:CreateDockWidgetPluginGuiAsync("districtMapper", widgetInfo)
@@ -170,7 +179,16 @@ local function makePanel(order)
 	}, root)
 	create("UICorner", { CornerRadius = UDim.new(0, 8) }, panel)
 	create("UIStroke", { Color = COLORS.stroke, Thickness = 1, Transparency = 0.45 }, panel)
-	create("UIPadding", { PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 8), PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, panel)
+	create(
+		"UIPadding",
+		{
+			PaddingTop = UDim.new(0, 8),
+			PaddingBottom = UDim.new(0, 8),
+			PaddingLeft = UDim.new(0, 8),
+			PaddingRight = UDim.new(0, 8),
+		},
+		panel
+	)
 	create("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, panel)
 	return panel
 end
@@ -226,11 +244,16 @@ local function updateButtons()
 		return first.Name < second.Name
 	end)
 	for index, district in districts do
-		local button = makeButton((district.Name == selectedDistrictName and "●  " or "○  ") .. district.Name, index, function()
-			selectedDistrictName = district.Name
-			updateStatus("Selected district " .. district.Name .. ". Select a face and assign it.")
-			updateButtons()
-		end, groupList)
+		local button = makeButton(
+			(district.Name == selectedDistrictName and "●  " or "○  ") .. district.Name,
+			index,
+			function()
+				selectedDistrictName = district.Name
+				updateStatus("Selected district " .. district.Name .. ". Select a face and assign it.")
+				updateButtons()
+			end,
+			groupList
+		)
 		button.Size = UDim2.new(1, 0, 0, 30)
 		button.TextXAlignment = Enum.TextXAlignment.Left
 		button.TextSize = 12
@@ -278,7 +301,8 @@ local function createEdge(group, firstIndex, secondIndex)
 		Name = "Edge_" .. key,
 		Shape = Enum.PartType.Cylinder,
 		Size = Vector3.new(delta.Magnitude, 1, 1),
-		CFrame = CFrame.lookAt((first.position + second.position) / 2, second.position) * CFrame.Angles(0, math.pi / 2, 0),
+		CFrame = CFrame.lookAt((first.position + second.position) / 2, second.position)
+			* CFrame.Angles(0, math.pi / 2, 0),
 		Anchored = true,
 		CanCollide = false,
 		CanTouch = false,
@@ -375,18 +399,18 @@ local function onSelectionChanged()
 	end
 
 	for _, instance in instances do
-			local sectionId = instance:GetAttribute("DistrictMapperFill")
-			if sectionId then
-				local groupId = instance:GetAttribute("DistrictMapperGroup")
-				for _, group in groups do
-					if group.id == groupId then
-						selectedSections[groupId .. ":" .. sectionId] = { group = group, sectionId = sectionId }
-						selectedSectionId = selectedSectionId or sectionId
-						activeGroup = group
-						break
-					end
+		local sectionId = instance:GetAttribute("DistrictMapperFill")
+		if sectionId then
+			local groupId = instance:GetAttribute("DistrictMapperGroup")
+			for _, group in groups do
+				if group.id == groupId then
+					selectedSections[groupId .. ":" .. sectionId] = { group = group, sectionId = sectionId }
+					selectedSectionId = selectedSectionId or sectionId
+					activeGroup = group
+					break
 				end
 			end
+		end
 		if not added[instance] then
 			local index = instance:GetAttribute("DistrictMapperPoint")
 			local groupId = instance:GetAttribute("DistrictMapperGroup")
@@ -515,7 +539,12 @@ end
 local function getBoundary(group)
 	local boundaries, err = getBoundaries(group)
 	if not boundaries or #boundaries ~= 1 then
-		return nil, err or (#boundaries == 0 and "Connect at least three points into a closed loop." or "The group contains multiple sections.")
+		return nil,
+			err
+				or (
+					#boundaries == 0 and "Connect at least three points into a closed loop."
+					or "The group contains multiple sections."
+				)
 	end
 	return boundaries[1]
 end
@@ -593,8 +622,11 @@ local function triangulate(points)
 		local firstNext = first % #projected + 1
 		for second = first + 1, #projected do
 			local secondNext = second % #projected + 1
-			if firstNext ~= second and secondNext ~= first
-				and segmentsIntersect(projected[first], projected[firstNext], projected[second], projected[secondNext]) then
+			if
+				firstNext ~= second
+				and secondNext ~= first
+				and segmentsIntersect(projected[first], projected[firstNext], projected[second], projected[secondNext])
+			then
 				return nil, "The outline contains intersecting edges."
 			end
 		end
@@ -633,7 +665,10 @@ local function triangulate(points)
 					end
 				end
 				if not containsPoint then
-					table.insert(triangles, { sourceIndices[previous], sourceIndices[current], sourceIndices[following] })
+					table.insert(
+						triangles,
+						{ sourceIndices[previous], sourceIndices[current], sourceIndices[following] }
+					)
 					table.remove(indices, i)
 					clipped = true
 					break
@@ -755,9 +790,11 @@ updatePolygon = function(group, forceRebuild)
 		end
 		if extrusionHeight == nil then
 			for _, extrusion in outputFolder:GetChildren() do
-				if extrusion:GetAttribute("DistrictMapperExtrusion")
+				if
+					extrusion:GetAttribute("DistrictMapperExtrusion")
 					and extrusion:GetAttribute("DistrictMapperGroup") == group.id
-					and extrusion:GetAttribute("DistrictMapperSection") == sectionId then
+					and extrusion:GetAttribute("DistrictMapperSection") == sectionId
+				then
 					extrusionHeight = extrusion:GetAttribute("DistrictMapperTotalHeight")
 					break
 				end
@@ -805,7 +842,8 @@ updatePolygon = function(group, forceRebuild)
 					local currentValue = current[axis]
 					local previousValue = previous[axis]
 					local currentInside = keepBelow and currentValue <= split or not keepBelow and currentValue >= split
-					local previousInside = keepBelow and previousValue <= split or not keepBelow and previousValue >= split
+					local previousInside = keepBelow and previousValue <= split
+						or not keepBelow and previousValue >= split
 					if currentInside ~= previousInside then
 						local alpha = (split - previousValue) / (currentValue - previousValue)
 						table.insert(clipped, previous:Lerp(current, alpha))
@@ -834,7 +872,8 @@ updatePolygon = function(group, forceRebuild)
 					local third = editableMesh:AddVertex(triangle[3] + Vector3.new(0, 0.025, 0) - meshCenter)
 					editableMesh:AddTriangle(first, third, second)
 				end
-				local fillPart = createMeshPart(editableMesh, "DistrictFill", group.preview, meshCenter, false, fillColor)
+				local fillPart =
+					createMeshPart(editableMesh, "DistrictFill", group.preview, meshCenter, false, fillColor)
 				fillPart:SetAttribute("DistrictMapperFill", sectionId)
 				fillPart:SetAttribute("DistrictMapperFillSignature", fillSignature)
 				fillPart:SetAttribute("DistrictMapperGroup", group.id)
@@ -856,7 +895,10 @@ updatePolygon = function(group, forceRebuild)
 				if depth >= 16 then
 					error("District fill could not be subdivided below the mesh size limit.")
 				end
-				local axis = if extents.X >= extents.Y and extents.X >= extents.Z then "X" elseif extents.Y >= extents.Z then "Y" else "Z"
+				local axis = if extents.X >= extents.Y and extents.X >= extents.Z
+					then "X"
+					elseif extents.Y >= extents.Z then "Y"
+					else "Z"
 				local split = (minimum[axis] + maximum[axis]) / 2
 				local below = {}
 				local above = {}
@@ -913,9 +955,11 @@ updatePolygon = function(group, forceRebuild)
 		if forceRebuild then
 			for _, extrusion in outputFolder:GetChildren() do
 				local sectionId = extrusion:GetAttribute("DistrictMapperSection")
-				if extrusion:GetAttribute("DistrictMapperExtrusion")
+				if
+					extrusion:GetAttribute("DistrictMapperExtrusion")
 					and extrusion:GetAttribute("DistrictMapperGroup") == group.id
-					and not activeSections[sectionId] then
+					and not activeSections[sectionId]
+				then
 					local editableMesh = runtimeExtrusions[extrusion]
 					if editableMesh then
 						editableMesh:Destroy()
@@ -972,8 +1016,7 @@ local function cleanExtrusionPolygon(positions)
 			local following = cleaned[index % #cleaned + 1]
 			local first = Vector2.new(current.X - previous.X, current.Z - previous.Z)
 			local second = Vector2.new(following.X - current.X, following.Z - current.Z)
-			if math.abs(first.X * second.Y - first.Y * second.X) <= 0.001
-				and first:Dot(second) >= -0.001 then
+			if math.abs(first.X * second.Y - first.Y * second.X) <= 0.001 and first:Dot(second) >= -0.001 then
 				table.remove(cleaned, index)
 				changed = true
 				break
@@ -1027,10 +1070,18 @@ local function buildExtrusionMesh(positions, height)
 		local second = positions[triangle[2]]
 		local third = positions[triangle[3]]
 		if height > 0 then
-			addFlatTriangle(first + Vector3.new(0, height, 0), third + Vector3.new(0, height, 0), second + Vector3.new(0, height, 0))
+			addFlatTriangle(
+				first + Vector3.new(0, height, 0),
+				third + Vector3.new(0, height, 0),
+				second + Vector3.new(0, height, 0)
+			)
 			addFlatTriangle(first, second, third)
 		else
-			addFlatTriangle(first + Vector3.new(0, height, 0), second + Vector3.new(0, height, 0), third + Vector3.new(0, height, 0))
+			addFlatTriangle(
+				first + Vector3.new(0, height, 0),
+				second + Vector3.new(0, height, 0),
+				third + Vector3.new(0, height, 0)
+			)
 			addFlatTriangle(first, third, second)
 		end
 	end
@@ -1098,8 +1149,16 @@ local function extrudeGroup(group, height, targetSectionId)
 	local minimum = Vector3.new(math.huge, math.huge, math.huge)
 	local maximum = Vector3.new(-math.huge, -math.huge, -math.huge)
 	for _, position in positions do
-		minimum = Vector3.new(math.min(minimum.X, position.X), math.min(minimum.Y, position.Y), math.min(minimum.Z, position.Z))
-		maximum = Vector3.new(math.max(maximum.X, position.X), math.max(maximum.Y, position.Y), math.max(maximum.Z, position.Z))
+		minimum = Vector3.new(
+			math.min(minimum.X, position.X),
+			math.min(minimum.Y, position.Y),
+			math.min(minimum.Z, position.Z)
+		)
+		maximum = Vector3.new(
+			math.max(maximum.X, position.X),
+			math.max(maximum.Y, position.Y),
+			math.max(maximum.Z, position.Z)
+		)
 	end
 	local chunkSize = MAX_MESH_SIZE
 	local created = {}
@@ -1121,20 +1180,31 @@ local function extrudeGroup(group, height, targetSectionId)
 					if #clipped >= 3 then
 						for verticalIndex = 0, verticalChunkCount - 1 do
 							local verticalOffset = verticalIndex * chunkSize * verticalDirection
-							local chunkHeight = verticalDirection * math.min(chunkSize, math.abs(height) - verticalIndex * chunkSize)
+							local chunkHeight = verticalDirection
+								* math.min(chunkSize, math.abs(height) - verticalIndex * chunkSize)
 							local chunkPositions = {}
 							for _, position in clipped do
 								table.insert(chunkPositions, position + Vector3.new(0, verticalOffset, 0))
 							end
 							local editableMesh, center
 							editableMesh, center, chunkPositions = buildExtrusionMesh(chunkPositions, chunkHeight)
-							local meshPart = createMeshPart(editableMesh, districtName .. "Build", nil, center, true, getDistrictColor(districtName))
+							local meshPart = createMeshPart(
+								editableMesh,
+								districtName .. "Build",
+								nil,
+								center,
+								true,
+								getDistrictColor(districtName)
+							)
 							meshPart.Name = districtName .. " " .. tostring(#group.outputs + #created + 1)
 							meshPart:SetAttribute("DistrictMapperGroup", group.id)
 							meshPart:SetAttribute("DistrictMapperExtrusion", true)
 							meshPart:SetAttribute("DistrictMapperSection", sectionId)
 							meshPart:SetAttribute("DistrictMapperDistrict", districtName)
-							meshPart:SetAttribute("DistrictMapperExportKey", group.id .. ":" .. sectionId .. ":" .. x .. ":" .. z .. ":" .. verticalIndex)
+							meshPart:SetAttribute(
+								"DistrictMapperExportKey",
+								group.id .. ":" .. sectionId .. ":" .. x .. ":" .. z .. ":" .. verticalIndex
+							)
 							meshPart:SetAttribute("DistrictMapperExtrusionId", HttpService:GenerateGUID(false))
 							meshPart:SetAttribute("DistrictMapperHeight", chunkHeight)
 							meshPart:SetAttribute("DistrictMapperTotalHeight", height)
@@ -1142,12 +1212,18 @@ local function extrudeGroup(group, height, targetSectionId)
 							for _, position in chunkPositions do
 								table.insert(serialized, { position.X, position.Y, position.Z })
 							end
-							meshPart:SetAttribute("DistrictMapperGeometry", HttpService:JSONEncode({ positions = serialized }))
-							meshPart:SetAttribute("DistrictMapperExportSignature", HttpService:JSONEncode({
-								positions = serialized,
-								height = chunkHeight,
-								district = districtName,
-							}))
+							meshPart:SetAttribute(
+								"DistrictMapperGeometry",
+								HttpService:JSONEncode({ positions = serialized })
+							)
+							meshPart:SetAttribute(
+								"DistrictMapperExportSignature",
+								HttpService:JSONEncode({
+									positions = serialized,
+									height = chunkHeight,
+									district = districtName,
+								})
+							)
 							meshPart.Parent = outputFolder
 							table.insert(created, meshPart)
 							table.insert(meshes, editableMesh)
@@ -1174,10 +1250,12 @@ local function extrudeGroup(group, height, targetSectionId)
 		createdSet[meshPart] = true
 	end
 	for _, existing in outputFolder:GetChildren() do
-		if not createdSet[existing]
+		if
+			not createdSet[existing]
 			and existing:GetAttribute("DistrictMapperExtrusion")
 			and existing:GetAttribute("DistrictMapperGroup") == group.id
-			and existing:GetAttribute("DistrictMapperSection") == sectionId then
+			and existing:GetAttribute("DistrictMapperSection") == sectionId
+		then
 			local editableMesh = runtimeExtrusions[existing]
 			if editableMesh then
 				editableMesh:Destroy()
@@ -1277,8 +1355,10 @@ assignDistrictButton = makeButton("Assign district to selected fills", 3, functi
 				end
 			end
 			for _, extrusion in outputFolder:GetChildren() do
-				if extrusion:GetAttribute("DistrictMapperGroup") == group.id
-					and extrusion:GetAttribute("DistrictMapperSection") == sectionId then
+				if
+					extrusion:GetAttribute("DistrictMapperGroup") == group.id
+					and extrusion:GetAttribute("DistrictMapperSection") == sectionId
+				then
 					extrusion:SetAttribute("DistrictMapperDistrict", selectedDistrictName)
 					extrusion.Color = fillColor
 				end
@@ -1287,7 +1367,15 @@ assignDistrictButton = makeButton("Assign district to selected fills", 3, functi
 				assigned += 1
 			end
 		end
-		updateStatus("Assigned " .. selectedDistrictName .. " to " .. assigned .. " selected face" .. (assigned == 1 and "" or "s") .. ".")
+		updateStatus(
+			"Assigned "
+				.. selectedDistrictName
+				.. " to "
+				.. assigned
+				.. " selected face"
+				.. (assigned == 1 and "" or "s")
+				.. "."
+		)
 		updateButtons()
 	end)
 end, districtPanel)
@@ -1300,7 +1388,10 @@ pointButton = makeButton("Add points", 2, function()
 	end
 	placingPoints = not placingPoints
 	plugin:Activate(true)
-	updateStatus(placingPoints and "Click map surfaces in the 3D viewport to add vertices." or "Point placement paused. Select vertices to link them.")
+	updateStatus(
+		placingPoints and "Click map surfaces in the 3D viewport to add vertices."
+			or "Point placement paused. Select vertices to link them."
+	)
 	updateButtons()
 end, pointPanel)
 linkButton = makeButton("Link selected points (0)", 3, function()
@@ -1314,7 +1405,11 @@ linkButton = makeButton("Link selected points (0)", 3, function()
 		return
 	end
 	for _, selected in selectedPoints do
-		if selected.group ~= group or not group.points[selected.index] or group.points[selected.index].marker ~= selected.point.marker then
+		if
+			selected.group ~= group
+			or not group.points[selected.index]
+			or group.points[selected.index].marker ~= selected.point.marker
+		then
 			updateStatus("Select points from the same core graph.")
 			return
 		end
@@ -1359,7 +1454,11 @@ makeButton("Subdivide selected edge", 5, function()
 	local first = selectedPoints[1]
 	local second = selectedPoints[2]
 	local group = first.group
-	if not group or second.group ~= group or not group.edges[math.min(first.index, second.index) .. ":" .. math.max(first.index, second.index)] then
+	if
+		not group
+		or second.group ~= group
+		or not group.edges[math.min(first.index, second.index) .. ":" .. math.max(first.index, second.index)]
+	then
 		updateStatus("Select the two endpoints of an existing edge in the same graph.")
 		return
 	end
@@ -1387,8 +1486,10 @@ makeButton("Subdivide selected edge", 5, function()
 			local containsEdge = false
 			for boundaryIndex, pointIndex in boundary do
 				local nextIndex = boundary[boundaryIndex % #boundary + 1]
-				if (pointIndex == first.index and nextIndex == second.index)
-					or (pointIndex == second.index and nextIndex == first.index) then
+				if
+					(pointIndex == first.index and nextIndex == second.index)
+					or (pointIndex == second.index and nextIndex == first.index)
+				then
 					containsEdge = true
 					break
 				end
@@ -1406,9 +1507,11 @@ makeButton("Subdivide selected edge", 5, function()
 				end
 				if height == nil then
 					for _, extrusion in outputFolder:GetChildren() do
-						if extrusion:GetAttribute("DistrictMapperExtrusion")
+						if
+							extrusion:GetAttribute("DistrictMapperExtrusion")
 							and extrusion:GetAttribute("DistrictMapperGroup") == group.id
-							and extrusion:GetAttribute("DistrictMapperSection") == sectionId then
+							and extrusion:GetAttribute("DistrictMapperSection") == sectionId
+						then
 							height = extrusion:GetAttribute("DistrictMapperTotalHeight")
 							break
 						end
@@ -1485,9 +1588,11 @@ makeButton("Subdivide selected edge", 5, function()
 					end
 				end
 				for _, extrusion in outputFolder:GetChildren() do
-					if extrusion:GetAttribute("DistrictMapperExtrusion")
+					if
+						extrusion:GetAttribute("DistrictMapperExtrusion")
 						and extrusion:GetAttribute("DistrictMapperGroup") == group.id
-						and extrusion:GetAttribute("DistrictMapperSection") == face.sectionId then
+						and extrusion:GetAttribute("DistrictMapperSection") == face.sectionId
+					then
 						local editableMesh = runtimeExtrusions[extrusion]
 						if editableMesh then
 							editableMesh:Destroy()
@@ -1541,7 +1646,9 @@ extrudeButton = makeButton("Extrude selected districts", 4, function()
 			end
 		end
 		if #failures > 0 then
-			updateStatus("Extruded " .. extruded .. " faces; " .. #failures .. " failed: " .. table.concat(failures, " | "))
+			updateStatus(
+				"Extruded " .. extruded .. " faces; " .. #failures .. " failed: " .. table.concat(failures, " | ")
+			)
 		else
 			updateStatus("Extruded " .. extruded .. " selected face" .. (extruded == 1 and "" or "s") .. ".")
 		end
@@ -1596,8 +1703,12 @@ exportButton = makeButton("Export extruded districts", 5, function()
 		local exportKey = exportedMesh:GetAttribute("DistrictMapperExportKey")
 		if exportKey then
 			exportedByKey[exportKey] = exportedMesh
-		elseif exportedMesh:GetAttribute("DistrictMapperGroup") and exportedMesh:GetAttribute("DistrictMapperSection") then
-			local sectionKey = exportedMesh:GetAttribute("DistrictMapperGroup") .. ":" .. exportedMesh:GetAttribute("DistrictMapperSection")
+		elseif
+			exportedMesh:GetAttribute("DistrictMapperGroup") and exportedMesh:GetAttribute("DistrictMapperSection")
+		then
+			local sectionKey = exportedMesh:GetAttribute("DistrictMapperGroup")
+				.. ":"
+				.. exportedMesh:GetAttribute("DistrictMapperSection")
 			legacyBySection[sectionKey] = legacyBySection[sectionKey] or {}
 			table.insert(legacyBySection[sectionKey], exportedMesh)
 		end
@@ -1605,11 +1716,17 @@ exportButton = makeButton("Export extruded districts", 5, function()
 	for _, extrusion in outputFolder:GetChildren() do
 		if extrusion:IsA("MeshPart") and extrusion:GetAttribute("DistrictMapperExtrusion") then
 			local districtName = extrusion:GetAttribute("DistrictMapperDistrict")
-			if not districtName or not ReplicatedStorage:FindFirstChild("Districts") or not ReplicatedStorage.Districts:FindFirstChild(districtName) then
+			if
+				not districtName
+				or not ReplicatedStorage:FindFirstChild("Districts")
+				or not ReplicatedStorage.Districts:FindFirstChild(districtName)
+			then
 				unassigned += 1
 			else
 				local exportKey = extrusion:GetAttribute("DistrictMapperExportKey")
-				local sectionKey = extrusion:GetAttribute("DistrictMapperGroup") .. ":" .. extrusion:GetAttribute("DistrictMapperSection")
+				local sectionKey = extrusion:GetAttribute("DistrictMapperGroup")
+					.. ":"
+					.. extrusion:GetAttribute("DistrictMapperSection")
 				local existingExport = exportKey and exportedByKey[exportKey]
 				if not existingExport and legacyBySection[sectionKey] and #legacyBySection[sectionKey] > 0 then
 					existingExport = table.remove(legacyBySection[sectionKey], 1)
@@ -1626,7 +1743,13 @@ exportButton = makeButton("Export extruded districts", 5, function()
 	end
 	if #pending == 0 then
 		cleanExportFolders()
-		updateStatus("Nothing changed to export. Existing zone folders were cleaned. " .. unassigned .. " extrusion" .. (unassigned == 1 and " has" or "s have") .. " no valid district assignment.")
+		updateStatus(
+			"Nothing changed to export. Existing zone folders were cleaned. "
+				.. unassigned
+				.. " extrusion"
+				.. (unassigned == 1 and " has" or "s have")
+				.. " no valid district assignment."
+		)
 		return
 	end
 	exportButton:SetAttribute("Exporting", true)
@@ -1658,7 +1781,8 @@ exportButton = makeButton("Export extruded districts", 5, function()
 				if #positions < 3 then
 					error("Missing extrusion geometry.")
 				end
-				local editableMesh = buildExtrusionMesh(positions, extrusion:GetAttribute("DistrictMapperHeight") or extrusion.Size.Y)
+				local editableMesh =
+					buildExtrusionMesh(positions, extrusion:GetAttribute("DistrictMapperHeight") or extrusion.Size.Y)
 				local uploadOk, uploadResult, assetId = pcall(function()
 					return AssetService:CreateAssetAsync(editableMesh, Enum.AssetType.Mesh, {
 						Name = extrusion.Name,
@@ -1683,9 +1807,13 @@ exportButton = makeButton("Export extruded districts", 5, function()
 				assetPart.Color = extrusion.Color
 				assetPart:SetAttribute("DistrictMapperExportSource", extrusionId)
 				assetPart:SetAttribute("DistrictMapperExportKey", extrusion:GetAttribute("DistrictMapperExportKey"))
-				assetPart:SetAttribute("DistrictMapperExportSignature", extrusion:GetAttribute("DistrictMapperExportSignature"))
+				assetPart:SetAttribute(
+					"DistrictMapperExportSignature",
+					extrusion:GetAttribute("DistrictMapperExportSignature")
+				)
 				assetPart:SetAttribute("DistrictMapperAssetId", assetId)
-				local districtName = group and getSectionDistricts(group)[extrusion:GetAttribute("DistrictMapperSection")]
+				local districtName = group
+						and getSectionDistricts(group)[extrusion:GetAttribute("DistrictMapperSection")]
 					or extrusion:GetAttribute("DistrictMapperDistrict")
 				local districtData = ReplicatedStorage:FindFirstChild("Districts")
 				local district = districtData and districtData:FindFirstChild(districtName)
@@ -1713,10 +1841,22 @@ exportButton = makeButton("Export extruded districts", 5, function()
 				exported += 1
 			else
 				failed += 1
-				updateStatus("Exporting " .. index .. "/" .. #pending .. ": " .. extrusion.Name .. " failed: " .. tostring(err))
+				updateStatus(
+					"Exporting " .. index .. "/" .. #pending .. ": " .. extrusion.Name .. " failed: " .. tostring(err)
+				)
 			end
 			exportButton.Text = "Exporting " .. index .. "/" .. #pending .. "..."
-			updateStatus("Exporting district meshes: " .. index .. "/" .. #pending .. " processed, " .. exported .. " uploaded, " .. failed .. " failed.")
+			updateStatus(
+				"Exporting district meshes: "
+					.. index
+					.. "/"
+					.. #pending
+					.. " processed, "
+					.. exported
+					.. " uploaded, "
+					.. failed
+					.. " failed."
+			)
 			task.wait()
 		end
 		cleanExportFolders()
@@ -1724,16 +1864,42 @@ exportButton = makeButton("Export extruded districts", 5, function()
 		exportButton.Text = "Export extruded districts"
 		exportButton.Active = true
 		exportButton.AutoButtonColor = true
-		updateStatus("Export complete: " .. exported .. " uploaded, " .. failed .. " failed, " .. unassigned .. " without a valid district assignment. Output: " .. exportFolder:GetFullName() .. ".")
+		updateStatus(
+			"Export complete: "
+				.. exported
+				.. " uploaded, "
+				.. failed
+				.. " failed, "
+				.. unassigned
+				.. " without a valid district assignment. Output: "
+				.. exportFolder:GetFullName()
+				.. "."
+		)
 	end)
 end, extrusionPanel)
 
-statusLabel.Text = "Waiting for ServerStorage ObjectValues: DistrictMapperPreview, DistrictMapGenerated, and Districts. Fill all three Value properties to start."
+statusLabel.Text =
+	"Waiting for ServerStorage ObjectValues: DistrictMapperPreview, DistrictMapGenerated, and Districts. Fill all three Value properties to start."
 
 local folderReferences = {
-	{ name = "DistrictMapperPreview", assign = function(value) previewFolder = value end },
-	{ name = "DistrictMapGenerated", assign = function(value) outputFolder = value end },
-	{ name = "Districts", assign = function(value) exportFolder = value end },
+	{
+		name = "DistrictMapperPreview",
+		assign = function(value)
+			previewFolder = value
+		end,
+	},
+	{
+		name = "DistrictMapGenerated",
+		assign = function(value)
+			outputFolder = value
+		end,
+	},
+	{
+		name = "Districts",
+		assign = function(value)
+			exportFolder = value
+		end,
+	},
 }
 
 while true do
@@ -1816,11 +1982,13 @@ refreshGroups = function()
 				local secondIndex = instance:GetAttribute("DistrictMapperEdgeB")
 				if (pointIndex or firstIndex or secondIndex) and not observedAttributes[instance] then
 					observedAttributes[instance] = connect(instance.AttributeChanged, function(attribute)
-						if attribute == "DistrictMapperPoint"
+						if
+							attribute == "DistrictMapperPoint"
 							or attribute == "DistrictMapperEdgeA"
 							or attribute == "DistrictMapperEdgeB"
-						or attribute == "DistrictMapperSharedVertex"
-							or attribute == "DistrictMapperGroup" then
+							or attribute == "DistrictMapperSharedVertex"
+							or attribute == "DistrictMapperGroup"
+						then
 							scheduleGroupRefresh(groupId)
 						end
 					end)
@@ -1841,46 +2009,55 @@ refreshGroups = function()
 								return
 							end
 							local point = currentGroup.points[pointIndex]
-						if not point then
-							return
-						end
-						point.position = instance.Position
-						local sharedVertexId = instance:GetAttribute("DistrictMapperSharedVertex")
-						if sharedVertexId then
-							for _, sharedGroup in groups do
-								for _, sharedPoint in sharedGroup.points do
-									if sharedPoint.marker ~= instance and sharedPoint.marker:GetAttribute("DistrictMapperSharedVertex") == sharedVertexId
-										and (sharedPoint.marker.Position - instance.Position).Magnitude > 0.001 then
-										sharedPoint.marker.Position = instance.Position
+							if not point then
+								return
+							end
+							point.position = instance.Position
+							local sharedVertexId = instance:GetAttribute("DistrictMapperSharedVertex")
+							if sharedVertexId then
+								for _, sharedGroup in groups do
+									for _, sharedPoint in sharedGroup.points do
+										if
+											sharedPoint.marker ~= instance
+											and sharedPoint.marker:GetAttribute("DistrictMapperSharedVertex") == sharedVertexId
+											and (sharedPoint.marker.Position - instance.Position).Magnitude > 0.001
+										then
+											sharedPoint.marker.Position = instance.Position
+										end
 									end
 								end
 							end
-						end
-						for neighborIndex in currentGroup.adjacency[pointIndex] or {} do
-							local edge = currentGroup.edges[math.min(pointIndex, neighborIndex) .. ":" .. math.max(pointIndex, neighborIndex)]
-							local neighbor = currentGroup.points[neighborIndex]
-							if edge and neighbor then
-								local delta = neighbor.position - point.position
-								if delta.Magnitude > 0.001 then
-									edge.Size = Vector3.new(delta.Magnitude, 1, 1)
-									edge.CFrame = CFrame.lookAt((point.position + neighbor.position) / 2, neighbor.position) * CFrame.Angles(0, math.pi / 2, 0)
-								end
-							end
-						end
-						if not pendingPolygonUpdates[groupId] then
-							pendingPolygonUpdates[groupId] = true
-							task.delay(0.12, function()
-								pendingPolygonUpdates[groupId] = nil
-								for _, candidate in groups do
-									if candidate.id == groupId then
-										updatePolygon(candidate)
-										break
+							for neighborIndex in currentGroup.adjacency[pointIndex] or {} do
+								local edge = currentGroup.edges[math.min(pointIndex, neighborIndex) .. ":" .. math.max(
+									pointIndex,
+									neighborIndex
+								)]
+								local neighbor = currentGroup.points[neighborIndex]
+								if edge and neighbor then
+									local delta = neighbor.position - point.position
+									if delta.Magnitude > 0.001 then
+										edge.Size = Vector3.new(delta.Magnitude, 1, 1)
+										edge.CFrame = CFrame.lookAt(
+											(point.position + neighbor.position) / 2,
+											neighbor.position
+										) * CFrame.Angles(0, math.pi / 2, 0)
 									end
 								end
-							end)
-						end
-						updateButtons()
-					end)
+							end
+							if not pendingPolygonUpdates[groupId] then
+								pendingPolygonUpdates[groupId] = true
+								task.delay(0.12, function()
+									pendingPolygonUpdates[groupId] = nil
+									for _, candidate in groups do
+										if candidate.id == groupId then
+											updatePolygon(candidate)
+											break
+										end
+									end
+								end)
+							end
+							updateButtons()
+						end)
 					end
 				end
 			end
@@ -1897,7 +2074,10 @@ refreshGroups = function()
 			local boundaries = getBoundaries(group)
 			group.closed = #boundaries > 0
 			for _, output in outputFolder:GetChildren() do
-				if output:GetAttribute("DistrictMapperGroup") == group.id and output:GetAttribute("DistrictMapperExtrusion") then
+				if
+					output:GetAttribute("DistrictMapperGroup") == group.id
+					and output:GetAttribute("DistrictMapperExtrusion")
+				then
 					table.insert(group.outputs, output)
 				end
 			end
@@ -1941,7 +2121,13 @@ local function onMouseDown()
 		return
 	end
 	local target = mouse.Target
-	if placingPoints and target and not target:IsDescendantOf(previewFolder) and not target:IsDescendantOf(outputFolder) and not target:IsDescendantOf(exportFolder) then
+	if
+		placingPoints
+		and target
+		and not target:IsDescendantOf(previewFolder)
+		and not target:IsDescendantOf(outputFolder)
+		and not target:IsDescendantOf(exportFolder)
+	then
 		addPoint(mouse.Hit.Position)
 	end
 end

@@ -18,14 +18,32 @@ local VALID_COLOR = Color3.fromRGB(75, 220, 125)
 local INVALID_COLOR = Color3.fromRGB(235, 75, 75)
 
 local toolbar = shared.paTools
-while not (toolbar and toolbar.ready and type(toolbar.addButton) == "function" and type(toolbar.setButtonHandler) == "function" and type(toolbar.removeButtonHandler) == "function") do
+while
+	not (
+		toolbar
+		and toolbar.ready
+		and type(toolbar.addButton) == "function"
+		and type(toolbar.setButtonHandler) == "function"
+		and type(toolbar.removeButtonHandler) == "function"
+	)
+do
 	task.wait()
 	toolbar = shared.paTools
 end
-local markButton = toolbar.addButton("Mark Cuttable", "Assign a shared hole-cutter group to the selected parts", "rbxassetid://1507949215")
-local cutterButton = toolbar.addButton("Add Cutter", "Place a cutter for the current hole-cutter group", "rbxassetid://1507949215")
-local applyButton = toolbar.addButton("Apply Holes", "Subtract every cutter in the group from every marked part", "rbxassetid://1507949215")
-local mergeAction = toolbar.addButton("Merge Parts", "Merge selected parts along their aligned axes", "rbxassetid://1507949215")
+local markButton = toolbar.addButton(
+	"Mark Cuttable",
+	"Assign a shared hole-cutter group to the selected parts",
+	"rbxassetid://1507949215"
+)
+local cutterButton =
+	toolbar.addButton("Add Cutter", "Place a cutter for the current hole-cutter group", "rbxassetid://1507949215")
+local applyButton = toolbar.addButton(
+	"Apply Holes",
+	"Subtract every cutter in the group from every marked part",
+	"rbxassetid://1507949215"
+)
+local mergeAction =
+	toolbar.addButton("Merge Parts", "Merge selected parts along their aligned axes", "rbxassetid://1507949215")
 
 local mouse = plugin:GetMouse()
 local currentGroupId
@@ -73,7 +91,9 @@ local function getParts(groupId)
 		if instance:IsA("BasePart") and instance:GetAttribute(GROUP_ATTRIBUTE) == groupId then
 			if instance:GetAttribute(CUTTER_ATTRIBUTE) == true and camera and instance:IsDescendantOf(camera) then
 				table.insert(cutters, instance)
-			elseif instance:GetAttribute(CUTTER_ATTRIBUTE) ~= true and (not camera or not instance:IsDescendantOf(camera)) then
+			elseif
+				instance:GetAttribute(CUTTER_ATTRIBUTE) ~= true and (not camera or not instance:IsDescendantOf(camera))
+			then
 				table.insert(targets, instance)
 			end
 		end
@@ -137,10 +157,26 @@ end
 
 local function copyProperties(source, destination)
 	local properties = {
-		"Color", "Material", "MaterialVariant", "Transparency", "Reflectance",
-		"Anchored", "CanCollide", "CanTouch", "CanQuery", "CastShadow", "Massless",
-		"RootPriority", "CollisionGroup", "CustomPhysicalProperties",
-		"TopSurface", "BottomSurface", "LeftSurface", "RightSurface", "FrontSurface", "BackSurface",
+		"Color",
+		"Material",
+		"MaterialVariant",
+		"Transparency",
+		"Reflectance",
+		"Anchored",
+		"CanCollide",
+		"CanTouch",
+		"CanQuery",
+		"CastShadow",
+		"Massless",
+		"RootPriority",
+		"CollisionGroup",
+		"CustomPhysicalProperties",
+		"TopSurface",
+		"BottomSurface",
+		"LeftSurface",
+		"RightSurface",
+		"FrontSurface",
+		"BackSurface",
 	}
 	for _, property in properties do
 		pcall(function()
@@ -165,9 +201,22 @@ local CopyProperties = copyProperties
 
 local function ArePropertiesEqual(first, second)
 	local properties = {
-		"Color", "Material", "MaterialVariant", "Transparency", "Reflectance",
-		"Anchored", "CanCollide", "CastShadow", "Massless", "RootPriority",
-		"TopSurface", "BottomSurface", "LeftSurface", "RightSurface", "FrontSurface", "BackSurface",
+		"Color",
+		"Material",
+		"MaterialVariant",
+		"Transparency",
+		"Reflectance",
+		"Anchored",
+		"CanCollide",
+		"CastShadow",
+		"Massless",
+		"RootPriority",
+		"TopSurface",
+		"BottomSurface",
+		"LeftSurface",
+		"RightSurface",
+		"FrontSurface",
+		"BackSurface",
 	}
 	for _, property in properties do
 		local firstOk, firstValue = pcall(function()
@@ -324,7 +373,9 @@ local function applyCuts()
 			table.insert(staged, { source = target, parent = target.Parent, results = results })
 		end
 		local latestTargets, latestCutters = getParts(groupId)
-		if not statesMatch(states) or not statesMatch(cutterStates)
+		if
+			not statesMatch(states)
+			or not statesMatch(cutterStates)
 			or signatureOf(latestTargets, latestCutters) ~= signatureOf(targets, cutters)
 		then
 			error("the cuttable group changed while geometry was being calculated")
@@ -358,8 +409,20 @@ local function applyCuts()
 		end
 		for _, instance in game:GetDescendants() do
 			if instance:IsA("JointInstance") and (instance.Part0 == source or instance.Part1 == source) then
-				table.insert(constraintStates, { instance = instance, part0 = instance.Part0, part1 = instance.Part1, c0 = instance.C0, c1 = instance.C1 })
-			elseif (instance:IsA("WeldConstraint") or instance:IsA("NoCollisionConstraint")) and (instance.Part0 == source or instance.Part1 == source) then
+				table.insert(
+					constraintStates,
+					{
+						instance = instance,
+						part0 = instance.Part0,
+						part1 = instance.Part1,
+						c0 = instance.C0,
+						c1 = instance.C1,
+					}
+				)
+			elseif
+				(instance:IsA("WeldConstraint") or instance:IsA("NoCollisionConstraint"))
+				and (instance.Part0 == source or instance.Part1 == source)
+			then
 				table.insert(constraintStates, { instance = instance, part0 = instance.Part0, part1 = instance.Part1 })
 			elseif instance:IsA("ObjectValue") and instance.Value == source then
 				table.insert(objectValueStates, { instance = instance, value = instance.Value })
@@ -537,33 +600,47 @@ local function beginPlacement()
 	end
 	placing = true
 	plugin:Activate(true)
-	table.insert(connections, mouse.Move:Connect(function()
-		if not placing then
-			return
-		end
-		local ray = workspace:Raycast(mouse.UnitRay.Origin, mouse.UnitRay.Direction * 1000)
-		if ray and ray.Instance:IsA("BasePart") and ray.Instance:GetAttribute(GROUP_ATTRIBUTE) == currentGroupId then
-			surfaceHighlight.Adornee = ray.Instance
-			surfaceHighlight.TargetSurface = normalId(ray.Instance, ray.Normal)
-		else
-			surfaceHighlight.Adornee = nil
-		end
-	end))
-	table.insert(connections, mouse.Button1Down:Connect(function()
-		if not placing then
-			return
-		end
-		local ray = workspace:Raycast(mouse.UnitRay.Origin, mouse.UnitRay.Direction * 1000)
-		if ray and ray.Instance:IsA("BasePart") and ray.Instance:GetAttribute(GROUP_ATTRIBUTE) == currentGroupId then
-			createCutter(ray.Position, ray.Normal)
-			placing = false
-			surfaceHighlight.Adornee = nil
-			for _, connection in connections do
-				connection:Disconnect()
+	table.insert(
+		connections,
+		mouse.Move:Connect(function()
+			if not placing then
+				return
 			end
-			table.clear(connections)
-		end
-	end))
+			local ray = workspace:Raycast(mouse.UnitRay.Origin, mouse.UnitRay.Direction * 1000)
+			if
+				ray
+				and ray.Instance:IsA("BasePart")
+				and ray.Instance:GetAttribute(GROUP_ATTRIBUTE) == currentGroupId
+			then
+				surfaceHighlight.Adornee = ray.Instance
+				surfaceHighlight.TargetSurface = normalId(ray.Instance, ray.Normal)
+			else
+				surfaceHighlight.Adornee = nil
+			end
+		end)
+	)
+	table.insert(
+		connections,
+		mouse.Button1Down:Connect(function()
+			if not placing then
+				return
+			end
+			local ray = workspace:Raycast(mouse.UnitRay.Origin, mouse.UnitRay.Direction * 1000)
+			if
+				ray
+				and ray.Instance:IsA("BasePart")
+				and ray.Instance:GetAttribute(GROUP_ATTRIBUTE) == currentGroupId
+			then
+				createCutter(ray.Position, ray.Normal)
+				placing = false
+				surfaceHighlight.Adornee = nil
+				for _, connection in connections do
+					connection:Disconnect()
+				end
+				table.clear(connections)
+			end
+		end)
+	)
 end
 
 local function MergeSelectedParts()
@@ -575,13 +652,15 @@ local function MergeSelectedParts()
 		end
 	end
 
-	if #parts < 2 then 
+	if #parts < 2 then
 		warn("Select at least 2 axis-aligned Block Parts to merge.")
-		return 
+		return
 	end
 
 	local recording = ChangeHistoryService:TryBeginRecording("HoleCutter_Merge", "Merge Parts")
-	if not recording then return end
+	if not recording then
+		return
+	end
 
 	local mergedAny = true
 	while mergedAny do
@@ -598,12 +677,20 @@ local function MergeSelectedParts()
 				local p1 = parts[i]
 				local p2 = parts[j]
 
-				if not ArePropertiesEqual(p1, p2) or p1.Parent ~= p2.Parent then continue end
+				if not ArePropertiesEqual(p1, p2) or p1.Parent ~= p2.Parent then
+					continue
+				end
 
 				-- Ensure orientations perfectly match
-				if p1.CFrame.RightVector:Dot(p2.CFrame.RightVector) < 0.9999999 then continue end
-				if p1.CFrame.UpVector:Dot(p2.CFrame.UpVector) < 0.9999999 then continue end
-				if p1.CFrame.LookVector:Dot(p2.CFrame.LookVector) < 0.9999999 then continue end
+				if p1.CFrame.RightVector:Dot(p2.CFrame.RightVector) < 0.9999999 then
+					continue
+				end
+				if p1.CFrame.UpVector:Dot(p2.CFrame.UpVector) < 0.9999999 then
+					continue
+				end
+				if p1.CFrame.LookVector:Dot(p2.CFrame.LookVector) < 0.9999999 then
+					continue
+				end
 
 				local size1 = p1.Size
 				local size2 = p2.Size
@@ -625,14 +712,16 @@ local function MergeSelectedParts()
 				local abutZ = dx and dy and (math.abs(max1.Z - min2.Z) < 0.005 or math.abs(max2.Z - min1.Z) < 0.005)
 
 				if abutX or abutY or abutZ then
-					local unionMin = Vector3.new(math.min(min1.X, min2.X), math.min(min1.Y, min2.Y), math.min(min1.Z, min2.Z))
-					local unionMax = Vector3.new(math.max(max1.X, max2.X), math.max(max1.Y, max2.Y), math.max(max1.Z, max2.Z))
+					local unionMin =
+						Vector3.new(math.min(min1.X, min2.X), math.min(min1.Y, min2.Y), math.min(min1.Z, min2.Z))
+					local unionMax =
+						Vector3.new(math.max(max1.X, max2.X), math.max(max1.Y, max2.Y), math.max(max1.Z, max2.Z))
 					local unionSize = unionMax - unionMin
 					local unionVol = unionSize.X * unionSize.Y * unionSize.Z
 
 					if unionVol > bestVol then
 						bestVol = unionVol
-						bestPair = {i, j}
+						bestPair = { i, j }
 						bestUnionSize = unionSize
 						bestUnionCFrame = p1.CFrame * CFrame.new((unionMin + unionMax) / 2)
 					end
@@ -662,7 +751,9 @@ local function MergeSelectedParts()
 			for _, child in ipairs(p1:GetChildren()) do
 				if not child:IsA("Texture") and not child:IsA("Decal") then
 					local clone = child:Clone()
-					if clone then clone.Parent = newPart end
+					if clone then
+						clone.Parent = newPart
+					end
 				end
 			end
 
@@ -681,8 +772,6 @@ local function MergeSelectedParts()
 	Selection:Set(parts)
 	ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
 end
-
-
 
 toolbar.setButtonHandler("Mark Cuttable", markCuttable)
 toolbar.setButtonHandler("Add Cutter", beginPlacement)
