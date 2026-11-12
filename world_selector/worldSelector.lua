@@ -37,8 +37,6 @@ do
 	toolbar = shared.paTools
 end
 
-
-
 local connections = {}
 local boxConnections = {}
 local folderConnections = {}
@@ -1019,7 +1017,6 @@ end
 
 toolbarCallbacks.worldSelector = reloadButtons
 reloadButtons()
-
 
 connect(plugin.Unloading, function()
 	toolbarCallbacks.worldSelector = nil
