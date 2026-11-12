@@ -56,18 +56,13 @@ jobs:
           stylua --check "${luau_files[@]}"
 
           definitions_file="$(mktemp)"
-          documentation_file="$(mktemp)"
-          trap 'rm -f "$definitions_file" "$documentation_file"' EXIT
+          trap 'rm -f "$definitions_file"' EXIT
 
           curl --fail --silent --show-error --location \
             https://luau-lsp.pages.dev/type-definitions/globalTypes.PluginSecurity.d.luau \
             --output "$definitions_file"
-          curl --fail --silent --show-error --location \
-            https://luau-lsp.pages.dev/api-docs/en-us.json \
-            --output "$documentation_file"
 
           luau-lsp analyze \
             --platform roblox \
             --definitions="roblox=$definitions_file" \
-            --docs="$documentation_file" \
             "${luau_files[@]}"
