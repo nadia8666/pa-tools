@@ -334,8 +334,58 @@ local function encodeBoxes(boxes)
 	return buffer.tostring(EncodingService:Base64Encode(compressed))
 end
 
+local function decodeBase64(code)
+	code = code:gsub("%s", "")
+	if #code == 0 or #code % 4 ~= 0 then
+		error("The code contains invalid Base64 data.")
+	end
+	local alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+	local values = {}
+	for index = 1, #alphabet do
+		values[alphabet:sub(index, index)] = index - 1
+	end
+	local bytes = {}
+	for index = 1, #code, 4 do
+		local first = values[code:sub(index, index)]
+		local second = values[code:sub(index + 1, index + 1)]
+		local thirdCharacter = code:sub(index + 2, index + 2)
+		local fourthCharacter = code:sub(index + 3, index + 3)
+		local third = values[thirdCharacter]
+		local fourth = values[fourthCharacter]
+		local isFinal = index + 3 == #code
+		if first == nil or second == nil or (third == nil and thirdCharacter ~= "=") or (fourth == nil and fourthCharacter ~= "=") then
+			error("The code contains invalid Base64 data.")
+		end
+		if thirdCharacter == "=" then
+			if fourthCharacter ~= "=" or not isFinal or second % 16 ~= 0 then
+				error("The code contains invalid Base64 data.")
+			end
+		elseif fourthCharacter == "=" then
+			if not isFinal or third % 4 ~= 0 then
+				error("The code contains invalid Base64 data.")
+			end
+		end
+		table.insert(bytes, first * 4 + math.floor(second / 16))
+		if thirdCharacter ~= "=" then
+			table.insert(bytes, second % 16 * 16 + math.floor(third / 4))
+		end
+		if fourthCharacter ~= "=" then
+			table.insert(bytes, third % 4 * 64 + fourth)
+		end
+	end
+	local decoded = buffer.create(#bytes)
+	for index, value in bytes do
+		buffer.writeu8(decoded, index - 1, value)
+	end
+	return decoded
+end
+
 local function decodeBoxes(code)
-	local decoded = EncodingService:Base64Decode(buffer.fromstring(code))
+	local normalizedCode = code:gsub("%s", "")
+	local success, decoded = pcall(EncodingService.Base64Decode, EncodingService, buffer.fromstring(normalizedCode))
+	if not success then
+		decoded = decodeBase64(normalizedCode)
+	end
 	local decompressedSize = EncodingService:GetDecompressedBufferSize(decoded, Enum.CompressionAlgorithm.Zstd)
 	if not decompressedSize then
 		error("The code contains invalid compressed data.")
