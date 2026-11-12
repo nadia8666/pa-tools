@@ -35,24 +35,19 @@ jobs:
           path: .
           token: ${{ github.token }}
 
-      - name: format and validate sources
+      - name: format sources
         shell: bash
         run: |
           set -euo pipefail
 
-          manifests=(
-            backend/combine/Cargo.toml
-            backend/sync/Cargo.toml
-          )
-
-          for manifest in "${manifests[@]}"; do
+          for manifest in backend/combine/Cargo.toml backend/sync/Cargo.toml; do
             cargo fmt --manifest-path "$manifest"
           done
 
-          mapfile -t luau_files < <(find . -type f \( -name '*.lua' -o -name '*.luau' \) -not -path './target/*' | sort)
+          mapfile -t luau_files < <(find combine district_mapper hole_cutter pa_tools sync_plugin -type f \( -name '*.lua' -o -name '*.luau' \) | sort)
 
           if [[ ${#luau_files[@]} -eq 0 ]]; then
-            echo "no Luau files found"
+            echo "no plugin source files found"
             exit 1
           fi
 
@@ -73,39 +68,29 @@ jobs:
           cp target/release/pa-combine.exe dist/windows/
           cp target/release/sync_backend.exe dist/windows/
 
-      - name: checkout luau compiler
-        uses: actions/checkout@v4
-        with:
-          repository: luau-lang/luau
-          ref: f46d879e28302a430029304f7f6a162aed66f103
-          path: luau-src
-
-      - name: build luau compiler
-        shell: bash
+      - name: package plugin sources
+        shell: pwsh
         run: |
-          set -euo pipefail
+          $sourceDirectories = @("combine", "district_mapper", "hole_cutter", "pa_tools", "sync_plugin")
+          $files = foreach ($directory in $sourceDirectories) {
+            Get-ChildItem -Path $directory -Recurse -File | Where-Object {
+              $_.Extension -in @(".lua", ".luau")
+            }
+          }
 
-          cmake -S luau-src -B luau-build -DCMAKE_BUILD_TYPE=Release -DLUAU_BUILD_TESTS=OFF
-          cmake --build luau-build --config Release --target Luau.Compile.CLI --parallel
+          if (-not $files) {
+            throw "no plugin source files found"
+          }
 
-      - name: compile plugin bytecode
-        shell: bash
-        run: |
-          set -euo pipefail
+          foreach ($file in $files) {
+            $relativePath = [IO.Path]::GetRelativePath($env:GITHUB_WORKSPACE, $file.FullName)
+            $destination = Join-Path "dist/plugins" $relativePath
+            $destinationDirectory = Split-Path $destination -Parent
+            New-Item -ItemType Directory -Force -Path $destinationDirectory | Out-Null
+            Copy-Item $file.FullName $destination
+          }
 
-          compiler="luau-build/Release/luau-compile.exe"
-          test -f "$compiler"
-
-          mapfile -t luau_files < <(find . -type f \( -name '*.lua' -o -name '*.luau' \) -not -path './target/*' -not -path './luau-src/*' -not -path './.git/*' | sort)
-
-          for source in "${luau_files[@]}"; do
-            relative="${source#./}"
-            relative="${relative%.lua}"
-            relative="${relative%.luau}"
-            output="dist/plugins/$relative.luac"
-            mkdir -p "$(dirname "$output")"
-            "$compiler" binary "$source" > "$output"
-          done
+          Compress-Archive -Path "dist/plugins/*" -DestinationPath "dist/pa-tools-plugins.zip" -Force
 
       - name: publish release assets
         uses: softprops/action-gh-release@v2
@@ -115,4 +100,4 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             dist/windows/*.exe
-            dist/plugins/**/*.luac
+            dist/pa-tools-plugins.zip

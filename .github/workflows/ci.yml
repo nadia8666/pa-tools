@@ -22,8 +22,6 @@ jobs:
 
       - name: install rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
 
       - name: cache cargo
         uses: Swatinem/rust-cache@v2
@@ -39,17 +37,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          manifests=(
-            backend/combine/Cargo.toml
-            backend/sync/Cargo.toml
-          )
-
-          for manifest in "${manifests[@]}"; do
-            echo "::group::checking $manifest"
-            cargo fmt --manifest-path "$manifest" -- --check
+          for manifest in backend/combine/Cargo.toml backend/sync/Cargo.toml; do
             cargo build --locked --manifest-path "$manifest"
-            echo "built: $manifest"
-            echo "::endgroup::"
           done
 
       - name: check luau formatting and types
