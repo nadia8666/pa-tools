@@ -2142,7 +2142,8 @@ connect(Selection.SelectionChanged, onSelectionChanged)
 
 local function reloadButtons()
 	toolbar = shared.paTools
-	toggleButton = toolbar.addButton("districtMapper", "Create and extrude district outlines", "rbxassetid://4458901886")
+	toggleButton =
+		toolbar.addButton("districtMapper", "Create and extrude district outlines", "rbxassetid://4458901886")
 	toolbar.setButtonHandler("districtMapper", function()
 		widget.Enabled = not widget.Enabled
 		toggleButton:SetActive(widget.Enabled)
@@ -2157,7 +2158,6 @@ end
 
 toolbarCallbacks.districtMapper = reloadButtons
 reloadButtons()
-
 
 connect(widget:GetPropertyChangedSignal("Enabled"), function()
 	toggleButton:SetActive(widget.Enabled)
