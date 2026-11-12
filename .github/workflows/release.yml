@@ -70,38 +70,33 @@ jobs:
         run: |
           set -euo pipefail
 
-          mkdir -p dist/windows
+          mkdir -p dist/release
           export CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target"
 
           cargo build --release --locked --manifest-path backend/combine/Cargo.toml
           cargo build --release --locked --manifest-path backend/sync/Cargo.toml
 
-          cp target/release/pa-combine.exe dist/windows/
-          cp target/release/sync_backend.exe dist/windows/
+          cp target/release/pa-combine.exe dist/release/
+          cp target/release/sync_backend.exe dist/release/
 
-      - name: package plugin sources
+      - name: stage plugin source files
         shell: pwsh
         run: |
-          $sourceDirectories = @("combine", "district_mapper", "hole_cutter", "pa_tools", "sync_plugin")
-          $files = foreach ($directory in $sourceDirectories) {
-            Get-ChildItem -Path $directory -Recurse -File | Where-Object {
-              $_.Extension -in @(".lua", ".luau")
+          $sourceFiles = @{
+            "paTools.lua" = "pa_tools/paTools.lua"
+            "PASync.lua" = "sync_plugin/PASync.lua"
+            "combinePlugin.lua" = "combine/combinePlugin.lua"
+            "districtMapper.lua" = "district_mapper/districtMapper.lua"
+            "holeCutter.lua" = "hole_cutter/holeCutter.lua"
+          }
+
+          foreach ($entry in $sourceFiles.GetEnumerator()) {
+            if (-not (Test-Path $entry.Value -PathType Leaf)) {
+              throw "missing release source file: $($entry.Value)"
             }
-          }
 
-          if (-not $files) {
-            throw "no plugin source files found"
+            Copy-Item $entry.Value (Join-Path "dist/release" $entry.Key)
           }
-
-          foreach ($file in $files) {
-            $relativePath = [IO.Path]::GetRelativePath($env:GITHUB_WORKSPACE, $file.FullName)
-            $destination = Join-Path "dist/plugins" $relativePath
-            $destinationDirectory = Split-Path $destination -Parent
-            New-Item -ItemType Directory -Force -Path $destinationDirectory | Out-Null
-            Copy-Item $file.FullName $destination
-          }
-
-          Compress-Archive -Path "dist/plugins/*" -DestinationPath "dist/pa-tools-plugins.zip" -Force
 
       - name: prepare release notes
         shell: bash
@@ -131,5 +126,10 @@ jobs:
           generate_release_notes: false
           fail_on_unmatched_files: true
           files: |
-            dist/windows/*.exe
-            dist/pa-tools-plugins.zip
+            dist/release/pa-combine.exe
+            dist/release/sync_backend.exe
+            dist/release/paTools.lua
+            dist/release/PASync.lua
+            dist/release/combinePlugin.lua
+            dist/release/districtMapper.lua
+            dist/release/holeCutter.lua
