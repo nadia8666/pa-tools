@@ -96,10 +96,13 @@ jobs:
           compiler="luau-build/Release/luau-compile.exe"
           test -f "$compiler"
 
-          mapfile -t luau_files < <(find . -type f -name '*.lua' -not -path './target/*' -not -path './luau-src/*' | sort)
+          mapfile -t luau_files < <(find . -type f \( -name '*.lua' -o -name '*.luau' \) -not -path './target/*' -not -path './luau-src/*' -not -path './.git/*' | sort)
 
           for source in "${luau_files[@]}"; do
-            output="dist/plugins/${source%.lua}.luac"
+            relative="${source#./}"
+            relative="${relative%.lua}"
+            relative="${relative%.luau}"
+            output="dist/plugins/$relative.luac"
             mkdir -p "$(dirname "$output")"
             "$compiler" binary "$source" > "$output"
           done
