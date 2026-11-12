@@ -136,27 +136,42 @@ local function getTopLevelSelection(part)
 	return selectedModel or part
 end
 
-local function getWorkspaceParts(revision)
+local function getNearbyParts(boxes, revision)
+	local radius = 0
+	for _, box in boxes do
+		if not box.Parent then
+			return nil
+		end
+		radius = math.max(radius, box.Size.Magnitude * 0.5)
+	end
+	if revision ~= refreshRevision then
+		return nil
+	end
+	updateProgress("Querying nearby Workspace instances...")
+	local selector = string.format("BasePart:in-radius(%.17g, Part#%s)", radius, BOX_NAME)
+	local queried = workspace:QueryDescendants(selector)
 	local parts = {}
-	local pending = { workspace }
-	local checked = 0
-	while #pending > 0 do
-		local parent = table.remove(pending)
-		for _, instance in parent:GetChildren() do
-			checked += 1
-			if not instance:IsA("Camera") then
-				if instance:IsA("BasePart") then
-					table.insert(parts, instance)
+	for index, instance in queried do
+		if instance:IsA("BasePart") and instance:IsDescendantOf(workspace) then
+			local ancestor = instance.Parent
+			local insideCamera = false
+			while ancestor and ancestor ~= workspace do
+				if ancestor:IsA("Camera") then
+					insideCamera = true
+					break
 				end
-				table.insert(pending, instance)
+				ancestor = ancestor.Parent
 			end
-			if checked % CHUNK_SIZE == 0 then
-				if revision ~= refreshRevision then
-					return nil
-				end
-				updateProgress(string.format("Collecting Workspace instances: %d", checked))
-				task.wait()
+			if not insideCamera then
+				table.insert(parts, instance)
 			end
+		end
+		if index % CHUNK_SIZE == 0 then
+			if revision ~= refreshRevision then
+				return nil
+			end
+			updateProgress(string.format("Filtering nearby instances: %d / %d", index, #queried))
+			task.wait()
 		end
 	end
 	if revision ~= refreshRevision then
@@ -527,7 +542,7 @@ local function refreshImportedHighlights()
 	end
 	updateProgress("Scanning Workspace...")
 	task.spawn(function()
-		local parts = getWorkspaceParts(revision)
+		local parts = getNearbyParts(boxes, revision)
 		if not parts then
 			return
 		end
@@ -636,7 +651,7 @@ local function selectContents()
 	local revision = refreshRevision
 	updateProgress("Scanning Workspace...")
 	task.spawn(function()
-		local parts = getWorkspaceParts(revision)
+		local parts = getNearbyParts(boxes, revision)
 		if not parts then
 			return
 		end
