@@ -1,12 +1,10 @@
-local state = shared.paToolsState
-if not state then
-	state = {
-		toolbar = plugin:CreateToolbar("PA Tools"),
-		buttons = {},
-		buttonConnections = {},
-	}
-	shared.paToolsState = state
-end
+local state = {
+	toolbar = plugin:CreateToolbar("PA Tools"),
+	buttons = {},
+	buttonConnections = {},
+}
+
+shared.paToolsState = state
 
 local api = {}
 
