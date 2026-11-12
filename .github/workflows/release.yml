@@ -44,7 +44,7 @@ jobs:
             cargo fmt --manifest-path "$manifest"
           done
 
-          mapfile -t luau_files < <(find combine district_mapper hole_cutter pa_tools sync_plugin -type f \( -name '*.lua' -o -name '*.luau' \) | sort)
+          mapfile -t luau_files < <(find combine district_mapper hole_cutter pa_tools sync_plugin world_selector -type f \( -name '*.lua' -o -name '*.luau' \) | sort)
 
           if [[ ${#luau_files[@]} -eq 0 ]]; then
             echo "no plugin source files found"
@@ -88,6 +88,7 @@ jobs:
             "combinePlugin.lua" = "combine/combinePlugin.lua"
             "districtMapper.lua" = "district_mapper/districtMapper.lua"
             "holeCutter.lua" = "hole_cutter/holeCutter.lua"
+            "worldSelector.lua" = "world_selector/worldSelector.lua"
           }
 
           foreach ($entry in $sourceFiles.GetEnumerator()) {
@@ -133,3 +134,4 @@ jobs:
             dist/release/combinePlugin.lua
             dist/release/districtMapper.lua
             dist/release/holeCutter.lua
+            dist/release/worldSelector.lua
