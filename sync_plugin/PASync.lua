@@ -781,7 +781,6 @@ end
 toolbarCallbacks.pSync = reloadButtons
 reloadButtons()
 
-
 local function setStatus(text)
 	status.Text = text
 	dot.BackgroundColor3 = if syncIgnored
