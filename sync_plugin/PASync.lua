@@ -764,10 +764,23 @@ do
 	task.wait()
 	toolbar = shared.paTools
 end
-toolbar.addButton("pSync", "Show sync status", "")
-toolbar.setButtonHandler("pSync", function()
-	widget.Enabled = not widget.Enabled
-end)
+local function reloadButtons()
+	toolbar = shared.paTools
+	toolbar.addButton("pSync", "Show sync status", "")
+	toolbar.setButtonHandler("pSync", function()
+		widget.Enabled = not widget.Enabled
+	end)
+end
+
+local toolbarCallbacks = shared.paToolbarCallbacks
+if not toolbarCallbacks then
+	toolbarCallbacks = {}
+	shared.paToolbarCallbacks = toolbarCallbacks
+end
+
+toolbarCallbacks.pSync = reloadButtons
+reloadButtons()
+
 
 local function setStatus(text)
 	status.Text = text
@@ -1607,6 +1620,7 @@ local function closeClient(target)
 end
 
 plugin.Unloading:Connect(function()
+	toolbarCallbacks.pSync = nil
 	toolbar.removeButtonHandler("pSync")
 	if client then
 		closeClient(client)

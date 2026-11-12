@@ -40,8 +40,7 @@ do
 	task.wait()
 	toolbar = shared.paTools
 end
-local toggleButton =
-	toolbar.addButton("districtMapper", "Create and extrude district outlines", "rbxassetid://4458901886")
+local toggleButton
 
 local widgetInfo = DockWidgetPluginGuiInfo.new(Enum.InitialDockState.Right, true, false, 300, 520, 260, 360)
 local widget = plugin:CreateDockWidgetPluginGuiAsync("districtMapper", widgetInfo)
@@ -2141,10 +2140,24 @@ end)
 connect(mouse.Button1Down, onMouseDown)
 connect(Selection.SelectionChanged, onSelectionChanged)
 
-toolbar.setButtonHandler("districtMapper", function()
-	widget.Enabled = not widget.Enabled
-	toggleButton:SetActive(widget.Enabled)
-end)
+local function reloadButtons()
+	toolbar = shared.paTools
+	toggleButton = toolbar.addButton("districtMapper", "Create and extrude district outlines", "rbxassetid://4458901886")
+	toolbar.setButtonHandler("districtMapper", function()
+		widget.Enabled = not widget.Enabled
+		toggleButton:SetActive(widget.Enabled)
+	end)
+end
+
+local toolbarCallbacks = shared.paToolbarCallbacks
+if not toolbarCallbacks then
+	toolbarCallbacks = {}
+	shared.paToolbarCallbacks = toolbarCallbacks
+end
+
+toolbarCallbacks.districtMapper = reloadButtons
+reloadButtons()
+
 
 connect(widget:GetPropertyChangedSignal("Enabled"), function()
 	toggleButton:SetActive(widget.Enabled)
@@ -2166,6 +2179,7 @@ connect(plugin.Deactivation, function()
 end)
 
 connect(plugin.Unloading, function()
+	toolbarCallbacks.districtMapper = nil
 	toolbar.removeButtonHandler("districtMapper")
 	for _, connection in connections do
 		connection:Disconnect()

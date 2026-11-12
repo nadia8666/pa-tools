@@ -27,8 +27,7 @@ do
 	task.wait()
 	toolbar = shared.paTools
 end
-local toggleButton =
-	toolbar.addButton("Combine", "Combine selected geometry and bake its appearance", "rbxassetid://4458901886")
+local toggleButton
 
 local widget = plugin:CreateDockWidgetPluginGuiAsync(
 	"PACombine",
@@ -2740,12 +2739,27 @@ widget:GetPropertyChangedSignal("Enabled"):Connect(function()
 	toggleButton:SetActive(widget.Enabled)
 end)
 
-toolbar.setButtonHandler("Combine", function()
-	widget.Enabled = not widget.Enabled
-	toggleButton:SetActive(widget.Enabled)
-end)
+local function reloadButtons()
+	toolbar = shared.paTools
+	toggleButton = toolbar.addButton("Combine", "Combine selected geometry and bake its appearance", "rbxassetid://4458901886")
+	toolbar.setButtonHandler("Combine", function()
+		widget.Enabled = not widget.Enabled
+		toggleButton:SetActive(widget.Enabled)
+	end)
+end
+
+local toolbarCallbacks = shared.paToolbarCallbacks
+if not toolbarCallbacks then
+	toolbarCallbacks = {}
+	shared.paToolbarCallbacks = toolbarCallbacks
+end
+
+toolbarCallbacks.combine = reloadButtons
+reloadButtons()
+
 
 plugin.Unloading:Connect(function()
+	toolbarCallbacks.combine = nil
 	closeClient()
 	toolbar.removeButtonHandler("Combine")
 end)

@@ -37,7 +37,7 @@ do
 	toolbar = shared.paTools
 end
 
-toolbar.addButton(BUTTON_ID, "Select or compare instances within 3D bounds", "rbxassetid://1507949215")
+
 
 local connections = {}
 local boxConnections = {}
@@ -989,7 +989,7 @@ connect(workspace:GetPropertyChangedSignal("CurrentCamera"), function()
 	end
 end)
 
-toolbar.setButtonHandler(BUTTON_ID, function()
+local function onButtonClicked()
 	if not folder or not folder.Parent then
 		if not createFolder() then
 			return
@@ -998,9 +998,26 @@ toolbar.setButtonHandler(BUTTON_ID, function()
 		return
 	end
 	selectContents()
-end)
+end
+
+local function reloadButtons()
+	toolbar = shared.paTools
+	toolbar.addButton(BUTTON_ID, "Select or compare instances within 3D bounds", "rbxassetid://1507949215")
+	toolbar.setButtonHandler(BUTTON_ID, onButtonClicked)
+end
+
+local toolbarCallbacks = shared.paToolbarCallbacks
+if not toolbarCallbacks then
+	toolbarCallbacks = {}
+	shared.paToolbarCallbacks = toolbarCallbacks
+end
+
+toolbarCallbacks.worldSelector = reloadButtons
+reloadButtons()
+
 
 connect(plugin.Unloading, function()
+	toolbarCallbacks.worldSelector = nil
 	toolbar.removeButtonHandler(BUTTON_ID)
 	refreshRevision += 1
 	boundsChangeRevision += 1

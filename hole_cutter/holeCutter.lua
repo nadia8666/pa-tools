@@ -30,10 +30,6 @@ do
 	task.wait()
 	toolbar = shared.paTools
 end
-toolbar.addButton("Mark Cuttable", "Assign a shared hole-cutter group to the selected parts", "rbxassetid://1507949215")
-toolbar.addButton("Add Cutter", "Place a cutter for the current hole-cutter group", "rbxassetid://1507949215")
-toolbar.addButton("Apply Holes", "Subtract every cutter in the group from every marked part", "rbxassetid://1507949215")
-toolbar.addButton("Merge Parts", "Merge selected parts along their aligned axes", "rbxassetid://1507949215")
 
 local mouse = plugin:GetMouse()
 local currentGroupId
@@ -760,10 +756,27 @@ local function MergeSelectedParts()
 	ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
 end
 
-toolbar.setButtonHandler("Mark Cuttable", markCuttable)
-toolbar.setButtonHandler("Add Cutter", beginPlacement)
-toolbar.setButtonHandler("Apply Holes", applyCuts)
-toolbar.setButtonHandler("Merge Parts", MergeSelectedParts)
+local function reloadButtons()
+	toolbar = shared.paTools
+	toolbar.addButton("Mark Cuttable", "Assign a shared hole-cutter group to the selected parts", "rbxassetid://1507949215")
+	toolbar.addButton("Add Cutter", "Place a cutter for the current hole-cutter group", "rbxassetid://1507949215")
+	toolbar.addButton("Apply Holes", "Subtract every cutter in the group from every marked part", "rbxassetid://1507949215")
+	toolbar.addButton("Merge Parts", "Merge selected parts along their aligned axes", "rbxassetid://1507949215")
+	toolbar.setButtonHandler("Mark Cuttable", markCuttable)
+	toolbar.setButtonHandler("Add Cutter", beginPlacement)
+	toolbar.setButtonHandler("Apply Holes", applyCuts)
+	toolbar.setButtonHandler("Merge Parts", MergeSelectedParts)
+end
+
+local toolbarCallbacks = shared.paToolbarCallbacks
+if not toolbarCallbacks then
+	toolbarCallbacks = {}
+	shared.paToolbarCallbacks = toolbarCallbacks
+end
+
+toolbarCallbacks.holeCutter = reloadButtons
+reloadButtons()
+
 
 Selection.SelectionChanged:Connect(function()
 	local selectedGroup = getGroupFromSelection()
@@ -795,6 +808,7 @@ task.spawn(function()
 end)
 
 plugin.Unloading:Connect(function()
+	toolbarCallbacks.holeCutter = nil
 	toolbar.removeButtonHandler("Mark Cuttable")
 	toolbar.removeButtonHandler("Add Cutter")
 	toolbar.removeButtonHandler("Apply Holes")
