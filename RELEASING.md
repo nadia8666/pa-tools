@@ -17,7 +17,7 @@ The tag workflow validates the version, formats and analyzes Luau in Roblox mode
 
 ## Release contents
 
-Each GitHub Release attaches these seven files individually at the top level, in this order:
+Each GitHub Release attaches these eight files individually at the top level, in this order:
 
 1. `pa-combine.exe`
 2. `sync_backend.exe`
@@ -26,6 +26,7 @@ Each GitHub Release attaches these seven files individually at the top level, in
 5. `combinePlugin.lua`
 6. `districtMapper.lua`
 7. `holeCutter.lua`
+8. `worldSelector.lua`
 
 The plugin source assets are the actual `.lua` files, not compiled `.luac` output. No plugin ZIP is generated.
 
