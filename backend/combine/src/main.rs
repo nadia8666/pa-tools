@@ -134,7 +134,7 @@ fn read_credential(target: &str) -> Option<String> {
                 String::from_utf16(
                     &bytes.chunks_exact(2).map(|value| u16::from_le_bytes([value[0], value[1]])).collect::<Vec<_>>()
                 ).ok()
-            }).map(|value| value.trim_end_matches('\\0').to_owned())
+            }).map(|value| value.trim_end_matches('\0').to_owned())
         }
     };
     unsafe { CredFree(pointer.cast()); }
