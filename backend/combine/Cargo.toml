@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 base64 = "0.22"
+draco-core = { version = "2.3.3", default-features = false, features = ["decoder", "edgebreaker_valence_decode", "legacy_bitstream_decode"] }
 futures-util = "0.3"
 flate2 = "1.0"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "bmp", "tga", "webp", "gif"] }

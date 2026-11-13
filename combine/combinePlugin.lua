@@ -1771,6 +1771,14 @@ local function onMessage(message)
 			)
 		)
 		local outputAssetCount = #geometryAssets > 0 and #geometryAssets or #assetIds
+		if outputAssetCount == 0 then
+			finishRequest(
+				"failed",
+				"AssetDelivery could not recover the inaccessible mesh assets. Original mesh instances were left unchanged.",
+				colors.warn
+			)
+			return
+		end
 		if outputAssetCount > 0 then
 			local failure = response.error or getFirstProcessingError(response)
 			if #geometryAssets > 0 then
@@ -1830,6 +1838,33 @@ local function onMessage(message)
 				)
 				return
 			end
+			local recoveredMeshNames = {}
+			for _, name in response.recoveredMeshNames or {} do
+				recoveredMeshNames[name] = true
+			end
+			local failedMeshNames = {}
+			for _, name in response.failedMeshNames or {} do
+				failedMeshNames[name] = true
+			end
+			local remainingGeometry = {}
+			local remainingPassthrough = {}
+			for _, meshPart in pendingSelection.geometry do
+				if failedMeshNames[pendingSelection.sourceIdentity[meshPart]] then
+					table.insert(remainingPassthrough, meshPart)
+				else
+					table.insert(remainingGeometry, meshPart)
+				end
+			end
+			for _, meshPart in pendingSelection.passthroughMeshParts do
+				local identity = pendingSelection.sourceIdentity[meshPart]
+				if recoveredMeshNames[identity] then
+					table.insert(remainingGeometry, meshPart)
+				else
+					table.insert(remainingPassthrough, meshPart)
+				end
+			end
+			pendingSelection.geometry = remainingGeometry
+			pendingSelection.passthroughMeshParts = remainingPassthrough
 			transitionRequest("replacing")
 			local replaced, meshPartCount, finalModel, replacementState = pcall(function()
 				local count, output, state =
@@ -2310,7 +2345,7 @@ local function extractMeshPart(meshPart, identity, assemblyId)
 		})
 	end)
 	if not ok then
-		error(string.format("Could not create an EditableMesh for %s: %s", meshPart:GetFullName(), tostring(editableMesh)))
+		return nil
 	end
 	if not editableMesh then
 		return nil
@@ -2352,6 +2387,7 @@ local function extractMeshPart(meshPart, identity, assemblyId)
 		local size = meshPart.Size
 		return {
 			name = identity,
+			meshAssetId = getContentUri(meshPart.MeshContent) or meshPart.MeshId,
 			assemblyId = assemblyId,
 			castShadow = meshPart.CastShadow,
 			positions = positions,
@@ -2377,7 +2413,7 @@ local function extractMeshPart(meshPart, identity, assemblyId)
 	end)
 	editableMesh:Destroy()
 	if not ok then
-		error(string.format("Could not extract MeshPart %s: %s", meshPart:GetFullName(), tostring(result)))
+		return nil
 	end
 	return result
 end
@@ -2601,14 +2637,40 @@ inspectButton.Activated:Connect(function()
 			local ok, extracted =
 				pcall(extractMeshPart, meshPart, sourceIdentity[meshPart], sourceAssemblyIdentity[meshPart])
 			if not ok then
-				setStatus(tostring(extracted), colors.bad)
-				return
+				extracted = nil
 			end
 			if extracted then
 				table.insert(meshInputs, extracted)
 			else
+				local meshSize = meshPart.MeshSize
+				local size = meshPart.Size
+				local emissiveTint, emissiveStrength = getPartEmissiveProperties(meshPart)
 				table.insert(passthroughMeshParts, meshPart)
-				geometryIdentity[meshPart] = nil
+				table.insert(meshInputs, {
+					name = sourceIdentity[meshPart],
+					meshAssetId = meshPart.MeshId,
+					assemblyId = sourceAssemblyIdentity[meshPart],
+					castShadow = meshPart.CastShadow,
+					positions = {},
+					normals = {},
+					uvs = {},
+					colors = {},
+					transform = { meshPart.CFrame:GetComponents() },
+					scale = {
+						if meshSize.X == 0 then 1 else size.X / meshSize.X,
+						if meshSize.Y == 0 then 1 else size.Y / meshSize.Y,
+						if meshSize.Z == 0 then 1 else size.Z / meshSize.Z,
+					},
+					doubleSided = meshPart.DoubleSided,
+					material = meshPart.Material.Name,
+					materialVariant = meshPart.MaterialVariant,
+					color = { meshPart.Color.R, meshPart.Color.G, meshPart.Color.B },
+					transparency = meshPart.Transparency,
+					localTransparencyModifier = meshPart.LocalTransparencyModifier,
+					reflectance = meshPart.Reflectance,
+					emissiveTint = emissiveTint,
+					emissiveStrength = emissiveStrength,
+				})
 			end
 		end
 		local primitiveInputs = {}

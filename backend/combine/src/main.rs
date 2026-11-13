@@ -1,3 +1,4 @@
+mod filemesh;
 mod glb;
 mod mesh;
 mod overlay;
@@ -9,7 +10,7 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use futures_util::{stream::FuturesUnordered, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::io::{self, Write};
-use std::{collections::{BTreeMap, BTreeSet, VecDeque}, error::Error, fs, net::SocketAddr, path::PathBuf, sync::{atomic::{AtomicBool, AtomicU64, Ordering}, Arc}, time::Duration};
+use std::{collections::{BTreeMap, BTreeSet, HashMap, VecDeque}, error::Error, fs, net::SocketAddr, path::PathBuf, sync::{atomic::{AtomicBool, AtomicU64, Ordering}, Arc}, time::Duration};
 use tokio::{net::TcpListener, sync::{mpsc, Semaphore}};
 use tokio_tungstenite::{accept_async_with_config, tungstenite::{protocol::WebSocketConfig, Message}};
 
@@ -117,6 +118,8 @@ struct SerializedUnion {
 #[serde(rename_all = "camelCase")]
 struct MeshInput {
     name: String,
+    #[serde(default)]
+    mesh_asset_id: Option<String>,
     #[serde(default)]
     assembly_id: String,
     #[serde(default)]
@@ -295,6 +298,8 @@ struct Response {
     texture_errors: Option<Vec<texture::TextureSourceError>>,
     overlay_count: Option<usize>,
     overlay_errors: Option<Vec<overlay::OverlayError>>,
+    recovered_mesh_names: Option<Vec<String>>,
+    failed_mesh_names: Option<Vec<String>>,
 }
 
 fn empty_response(id: u64, error: impl Into<String>) -> Response {
@@ -326,6 +331,8 @@ fn empty_response(id: u64, error: impl Into<String>) -> Response {
         texture_errors: None,
         overlay_count: None,
         overlay_errors: None,
+        recovered_mesh_names: None,
+        failed_mesh_names: None,
     }
 }
 
@@ -361,6 +368,8 @@ fn inspect(request: &Request) -> Response {
         texture_errors: None,
         overlay_count: None,
         overlay_errors: None,
+        recovered_mesh_names: None,
+        failed_mesh_names: None,
     }
 }
 
@@ -388,6 +397,8 @@ struct GeometryResult {
     union_count: usize,
     primitive_count: usize,
     errors: Vec<SourceError>,
+    recovered_mesh_names: Vec<String>,
+    failed_mesh_names: Vec<String>,
 }
 
 async fn process_geometry(request: &Request, texture_bindings: &[texture::TextureBindingInfo], cancelled: &AtomicBool) -> GeometryResult {
@@ -400,20 +411,54 @@ async fn process_geometry(request: &Request, texture_bindings: &[texture::Textur
     let mut union_count = 0;
     let mut primitive_count = 0;
 
+    let client = reqwest::Client::builder().user_agent("PA Combine").timeout(Duration::from_secs(20)).redirect(reqwest::redirect::Policy::limited(5)).build().unwrap_or_default();
+    let mut asset_mesh_cache = HashMap::<String, std::result::Result<filemesh::FileMeshData, String>>::new();
+    let mut recovered_mesh_names = Vec::new();
+    let mut failed_mesh_names = Vec::new();
+    let fallback_asset_ids: BTreeSet<String> = mesh_inputs.iter()
+        .filter(|input| input.positions.is_empty())
+        .filter_map(|input| input.mesh_asset_id.as_deref())
+        .filter_map(asset_id_from_uri)
+        .collect();
+
     for input in mesh_inputs {
         tokio::task::yield_now().await;
         if cancelled.load(Ordering::Relaxed) { break; }
+        let fallback = if let Some(asset_uri) = input.mesh_asset_id.as_deref().filter(|uri| asset_id_from_uri(uri).is_some_and(|id| fallback_asset_ids.contains(&id))) {
+            let Some(asset_id) = asset_id_from_uri(asset_uri) else { continue; };
+            if !asset_mesh_cache.contains_key(&asset_id) {
+                let url = format!("https://assetdelivery.roblox.com/v1/asset/?id={asset_id}");
+                let downloaded = async {
+                    let response = client.get(url).send().await.map_err(|error| error.to_string())?;
+                    if !response.status().is_success() {
+                        return Err(format!("AssetDelivery returned HTTP {}", response.status()));
+                    }
+                    let bytes = response.bytes().await.map_err(|error| error.to_string())?;
+                    filemesh::parse(&bytes)
+                }.await;
+                asset_mesh_cache.insert(asset_id.to_string(), downloaded);
+            }
+            match asset_mesh_cache.get(&asset_id) {
+                Some(Ok(data)) => {
+                    recovered_mesh_names.push(input.name.clone());
+                    Some(data.clone())
+                }
+                _ => {
+                    failed_mesh_names.push(input.name.clone());
+                    continue;
+                }
+            }
+        } else {
+            None
+        };
+        let positions = fallback.as_ref().map(|data| &data.positions).unwrap_or(&input.positions);
+        let normals = fallback.as_ref().map(|data| &data.normals).unwrap_or(&input.normals);
+        let uvs = fallback.as_ref().map(|data| &data.uvs).unwrap_or(&input.uvs);
+        let colors = fallback.as_ref().map(|data| &data.colors).unwrap_or(&input.colors);
         let binding = texture_binding(&input.name, texture_bindings);
         let skip_part_color = binding.is_some_and(|binding| binding.skip_part_color);
         let result = mesh::MeshData::from_mesh_part(
-            &input.positions,
-            &input.normals,
-            &input.uvs,
-            &input.colors,
-            &input.transform,
-            &input.scale,
-            input.double_sided,
-            binding,
+            positions, normals, uvs, colors, &input.transform, &input.scale, input.double_sided, binding,
         ).and_then(|mut mesh| {
             mesh.cast_shadow = input.cast_shadow;
             mesh.apply_color_multiplier(if skip_part_color { [1.0; 3] } else { input.color }, input.transparency, input.local_transparency_modifier)?;
@@ -514,7 +559,14 @@ async fn process_geometry(request: &Request, texture_bindings: &[texture::Textur
         union_count,
         primitive_count,
         errors,
+        recovered_mesh_names,
+        failed_mesh_names,
     }
+}
+
+fn asset_id_from_uri(uri: &str) -> Option<String> {
+    let digits = uri.rsplit(|character: char| !character.is_ascii_digit()).find(|value| !value.is_empty())?;
+    Some(digits.to_string())
 }
 
 fn transform_overlay_point(point: [f32; 3], transform: &[f32; 12]) -> [f32; 3] {
@@ -1579,6 +1631,8 @@ async fn process_request(request: &mut Request, progress: &mpsc::UnboundedSender
             let path = output_paths.first().cloned().unwrap_or_default();
             let glb_bytes = output_bytes.iter().sum();
             let source_errors = result.errors;
+            let recovered_mesh_names = result.recovered_mesh_names;
+            let failed_mesh_names = result.failed_mesh_names;
             let ok = error.is_none();
             let message = if geometry_assets.is_some() {
                 format!("Merged {success_count} sources into {} independently uploadable mesh assets.", geometry_assets.as_ref().map_or(0, Vec::len))
@@ -1623,6 +1677,8 @@ async fn process_request(request: &mut Request, progress: &mpsc::UnboundedSender
                 texture_errors: Some(texture_errors),
                 overlay_count: Some(overlay_count),
                 overlay_errors: Some(overlay_errors),
+                recovered_mesh_names: Some(recovered_mesh_names),
+                failed_mesh_names: Some(failed_mesh_names),
             }
         }
         _ => empty_response(request.id, format!("Unsupported request type: {}", request.request_type)),
