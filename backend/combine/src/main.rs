@@ -536,7 +536,6 @@ async fn process_geometry(request: &mut Request, texture_bindings: &[texture::Te
         let fallback = if let Some(asset_uri) = input.mesh_asset_id.as_deref().filter(|uri| asset_id_from_uri(uri).is_some_and(|id| fallback_asset_ids.contains(&id))) {
             let Some(asset_id) = asset_id_from_uri(asset_uri) else { continue; };
             if !asset_mesh_cache.contains_key(&asset_id) {
-                let url = format!("https://assetdelivery.roblox.com/v1/asset/?id={asset_id}");
                 let downloaded = async {
                     let cookie = studio_cookie().map_err(|error| error.to_string())?;
                     let bytes = download_mesh_asset(&client, &asset_id, &cookie).await?;
