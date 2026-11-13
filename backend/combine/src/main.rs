@@ -449,6 +449,10 @@ async fn process_geometry(request: &Request, texture_bindings: &[texture::Textur
                 }
             }
         } else {
+            if input.positions.is_empty() {
+                failed_mesh_names.push(input.name.clone());
+                continue;
+            }
             None
         };
         let positions = fallback.as_ref().map(|data| &data.positions).unwrap_or(&input.positions);

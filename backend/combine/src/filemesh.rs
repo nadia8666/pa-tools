@@ -222,8 +222,7 @@ fn decode_draco(bytes: &[u8], face_limit: Option<usize>) -> Result<FileMeshData,
             let uv_index = index * 2;
             output.uvs.push(uv.as_ref().map(|v| [v[uv_index], v[uv_index + 1]]).unwrap_or([0.0, 0.0]));
             let color_index = index * 4;
-            let mut rgba = color.as_ref().map(|v| [v[color_index], v[color_index + 1], v[color_index + 2], v[color_index + 3]]).unwrap_or([1.0; 4]);
-            if rgba.iter().any(|component| *component > 1.0) { rgba = rgba.map(|component| component / 255.0); }
+            let rgba = color.as_ref().map(|v| [v[color_index] / 255.0, v[color_index + 1] / 255.0, v[color_index + 2] / 255.0, v[color_index + 3] / 255.0]).unwrap_or([1.0; 4]);
             output.colors.push(rgba);
         }
     }
@@ -284,5 +283,45 @@ pub fn parse(bytes: &[u8]) -> Result<FileMeshData, String> {
         "version 6.00" => decode_chunked(data, false),
         "version 7.00" => decode_chunked(data, true),
         _ => Err(format!("Unsupported FileMesh version: {header}")),
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_ascii_filemesh_versions() {
+        let data = "[0,0,0][0,0,1][0,0,0][1,0,0][0,0,1][1,0,0][0,1,0][0,0,1][0,1,0]";
+        let version100 = format!("version 1.00\n1\n{data}");
+        let version101 = format!("version 1.01\n1\n{data}");
+        let first = parse(version100.as_bytes()).unwrap();
+        let second = parse(version101.as_bytes()).unwrap();
+        assert_eq!(first.positions[1], [0.5, 0.0, 0.0]);
+        assert_eq!(second.positions[1], [1.0, 0.0, 0.0]);
+        assert_eq!(second.uvs[2], [0.0, 0.0]);
+    }
+
+    #[test]
+    fn parses_binary_filemesh_without_vertex_colors() {
+        let mut bytes = b"version 2.00\n".to_vec();
+        bytes.extend_from_slice(&12u16.to_le_bytes());
+        bytes.extend_from_slice(&[36, 12]);
+        bytes.extend_from_slice(&3u32.to_le_bytes());
+        bytes.extend_from_slice(&1u32.to_le_bytes());
+        for position in [[0.0f32, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]] {
+            for value in [position[0], position[1], position[2], 0.0, 0.0, 1.0, 0.0, 0.0] {
+                bytes.extend_from_slice(&value.to_le_bytes());
+            }
+            bytes.extend_from_slice(&[0; 4]);
+        }
+        for index in [0u32, 1, 2] {
+            bytes.extend_from_slice(&index.to_le_bytes());
+        }
+        let mesh = parse(&bytes).unwrap();
+        assert_eq!(mesh.positions.len(), 3);
+        assert_eq!(mesh.positions[1], [1.0, 0.0, 0.0]);
+        assert_eq!(mesh.colors, vec![[1.0; 4]; 3]);
     }
 }
