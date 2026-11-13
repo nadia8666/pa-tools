@@ -1375,6 +1375,13 @@ local function captureReplacementState(snapshot, models, meshParts)
 			angular = source.AssemblyAngularVelocity,
 		}
 	end
+	for _, source in snapshot.passthroughMeshParts do
+		sources[source] = true
+		state.velocities[source] = {
+			linear = source.AssemblyLinearVelocity,
+			angular = source.AssemblyAngularVelocity,
+		}
+	end
 	for _, instance in game:GetDescendants() do
 		if instance:IsA("JointInstance") or instance:IsA("WeldConstraint") or instance:IsA("NoCollisionConstraint") then
 			if sources[instance.Part0] or sources[instance.Part1] then
@@ -2642,6 +2649,16 @@ inspectButton.Activated:Connect(function()
 				emissiveTint = emissiveTint,
 				emissiveStrength = emissiveStrength,
 			})
+		end
+		if #meshInputs == 0 and #unionInputs == 0 and #primitiveInputs == 0 then
+			setStatus(
+				string.format(
+					"Could not access editable geometry for %d MeshPart(s). Original meshes were left unchanged.",
+					#passthroughMeshParts
+				),
+				colors.warn
+			)
+			return
 		end
 		local textureInputs = extractTextureInputs(selected, geometryIdentity)
 		local surfaceOverlays = extractSurfaceOverlays(selected, geometryIdentity, sourceAssemblyIdentity)
