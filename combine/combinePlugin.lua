@@ -1594,7 +1594,9 @@ local function replaceSelection(snapshot, models, meshParts, sourceAssignments, 
 	table.insert(replacementState.created, outputModel)
 	local succeeded, result = pcall(function()
 		for _, passthrough in snapshot.passthroughMeshParts do
-			passthrough.Parent = outputModel
+			local clone = passthrough:Clone()
+			clone.Parent = outputModel
+			table.insert(replacementState.created, clone)
 		end
 		for _, model in models do
 			for _, descendant in model:GetDescendants() do
