@@ -67,6 +67,80 @@ static FILE_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 static PROGRESS_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 const MAX_ASSET_BYTES: usize = 20_000_000;
 
+fn studio_cookie() -> Result<String> {
+    if let Ok(value) = std::env::var("ROBLOSECURITY") {
+        if !value.is_empty() {
+            return Ok(value);
+        }
+    }
+    #[cfg(windows)] {
+        if let Some(user) = read_credential("https://www.roblox.com:RobloxStudioAuthuserid") {
+            if let Some(cookie) = read_credential(&format!("https://www.roblox.com:RobloxStudioAuth.ROBLOSECURITY{user}")) {
+                return Ok(cookie);
+            }
+        }
+        if let Some(cookie) = read_credential("https://www.roblox.com:RobloxStudioAuth.ROBLOSECURITY") {
+            return Ok(cookie);
+        }
+    }
+    Err("Roblox Studio credential unavailable; sign in to Studio or set ROBLOSECURITY".into())
+}
+
+#[cfg(windows)]
+#[repr(C)]
+struct FileTime {
+    low: u32,
+    high: u32,
+}
+
+#[cfg(windows)]
+#[repr(C)]
+struct Credential {
+    flags: u32,
+    kind: u32,
+    target: *mut u16,
+    comment: *mut u16,
+    written: FileTime,
+    blob_size: u32,
+    blob: *mut u8,
+    persist: u32,
+    attribute_count: u32,
+    attributes: *mut std::ffi::c_void,
+    alias: *mut u16,
+    username: *mut u16,
+}
+
+#[cfg(windows)]
+#[link(name = "Advapi32")]
+unsafe extern "system" {
+    fn CredReadW(target: *const u16, kind: u32, flags: u32, output: *mut *mut Credential) -> i32;
+    fn CredFree(buffer: *mut std::ffi::c_void);
+}
+
+#[cfg(windows)]
+fn read_credential(target: &str) -> Option<String> {
+    let target: Vec<u16> = target.encode_utf16().chain(Some(0)).collect();
+    let mut pointer = std::ptr::null_mut();
+    if unsafe { CredReadW(target.as_ptr(), 1, 0, &mut pointer) } == 0 || pointer.is_null() {
+        return None;
+    }
+    let result = unsafe {
+        let value = &*pointer;
+        if value.blob.is_null() || value.blob_size == 0 {
+            None
+        } else {
+            let bytes = std::slice::from_raw_parts(value.blob, value.blob_size as usize);
+            std::str::from_utf8(bytes).ok().map(str::to_owned).or_else(|| {
+                String::from_utf16(
+                    &bytes.chunks_exact(2).map(|value| u16::from_le_bytes([value[0], value[1]])).collect::<Vec<_>>()
+                ).ok()
+            }).map(|value| value.trim_end_matches('\\0').to_owned())
+        }
+    };
+    unsafe { CredFree(pointer.cast()); }
+    result.filter(|value| !value.is_empty())
+}
+
 struct TemporaryTextureFiles(Vec<PathBuf>);
 
 impl Drop for TemporaryTextureFiles {
@@ -436,7 +510,10 @@ async fn process_geometry(request: &mut Request, texture_bindings: &[texture::Te
             if !asset_mesh_cache.contains_key(&asset_id) {
                 let url = format!("https://assetdelivery.roblox.com/v1/asset/?id={asset_id}");
                 let downloaded = async {
-                    let response = client.get(url).send().await.map_err(|error| error.to_string())?;
+                    let cookie = studio_cookie().map_err(|error| error.to_string())?;
+                    let response = client.get(url)
+                        .header(reqwest::header::COOKIE, format!(".ROBLOSECURITY={cookie}"))
+                        .send().await.map_err(|error| error.to_string())?;
                     if !response.status().is_success() {
                         return Err(format!("AssetDelivery returned HTTP {}", response.status()));
                     }
