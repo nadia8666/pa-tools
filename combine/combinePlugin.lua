@@ -285,7 +285,7 @@ local setErrorDetails
 local function finishRequest(state, message, color)
 	transitionRequest(state)
 	if state == "complete" or state == "cancelled" then
-		setErrorDetails(nil)
+		setErrorDetails("")
 	end
 	pendingRequest = nil
 	pendingSelection = nil
@@ -306,7 +306,7 @@ setStatus = function(message, color)
 end
 
 setErrorDetails = function(message)
-	errorDetails.Text = message
+	errorDetails.Text = message or ""
 	errorDetails.Visible = message ~= nil and message ~= ""
 end
 
@@ -1705,14 +1705,11 @@ local function showPreview(models)
 end
 
 local function onMessage(message)
-	print(string.format("[PA Combine] received worker message (%d bytes)", #message))
-	local decodeStarted = os.clock()
 	local ok, response = pcall(HttpService.JSONDecode, HttpService, message)
 	if not ok then
 		setStatus("Worker returned an invalid response: " .. tostring(response), colors.bad)
 		return
 	end
-	print(string.format("[PA Combine] decoded worker message in %.3f seconds", os.clock() - decodeStarted))
 	if response.id ~= pendingRequest then
 		return
 	end
@@ -1765,7 +1762,8 @@ local function onMessage(message)
 		warn(string.format("[PA Combine] overlay error: %s: %s", issue.name, issue.error))
 	end
 	for _, name in response.failedMeshNames or {} do
-		warn(string.format("[PA Combine] preserving %s because its mesh asset could not be recovered", name))
+		local detail = response.meshRecoveryErrors and response.meshRecoveryErrors[name]
+		warn(string.format("[PA Combine] preserving %s because its mesh asset could not be recovered%s", name, detail and ": " .. detail or ""))
 	end
 	if response.mergedVertexCount then
 		selectionStats.Text = string.format(
