@@ -479,6 +479,34 @@ struct GeometryResult {
     mesh_recovery_errors: HashMap<String, String>,
 }
 
+async fn download_mesh_asset(client: &reqwest::Client, asset_id: &str, cookie: &str) -> std::result::Result<Vec<u8>, String> {
+    let url = format!("https://assetdelivery.roblox.com/v1/asset/?id={asset_id}");
+    let response = client.get(url)
+        .header(reqwest::header::COOKIE, format!(".ROBLOSECURITY={cookie}"))
+        .send().await.map_err(|error| error.to_string())?;
+    let content_type = response.headers().get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok()).unwrap_or("").to_owned();
+    if response.status().is_redirection() {
+        let url = response.headers().get(reqwest::header::LOCATION)
+            .ok_or_else(|| "AssetDelivery redirect omitted location".to_string())?
+            .to_str().map_err(|error| error.to_string())?.to_owned();
+        return client.get(url).send().await.map_err(|error| error.to_string())?
+            .error_for_status().map_err(|error| error.to_string())?
+            .bytes().await.map(|bytes| bytes.to_vec()).map_err(|error| error.to_string());
+    }
+    let response = response.error_for_status().map_err(|error| error.to_string())?;
+    if content_type.contains("json") {
+        let payload = response.json::<serde_json::Value>().await.map_err(|error| error.to_string())?;
+        let url = payload["locations"].as_array()
+            .and_then(|locations| locations.iter().find_map(|location| location["location"].as_str()))
+            .ok_or_else(|| "AssetDelivery response omitted its download location".to_string())?;
+        return client.get(url).send().await.map_err(|error| error.to_string())?
+            .error_for_status().map_err(|error| error.to_string())?
+            .bytes().await.map(|bytes| bytes.to_vec()).map_err(|error| error.to_string());
+    }
+    response.bytes().await.map(|bytes| bytes.to_vec()).map_err(|error| error.to_string())
+}
+
 async fn process_geometry(request: &mut Request, texture_bindings: &[texture::TextureBindingInfo], cancelled: &AtomicBool) -> GeometryResult {
     let mesh_inputs = request.mesh_inputs.as_deref().unwrap_or_default();
     let union_inputs = request.union_inputs.as_deref().unwrap_or_default();
@@ -489,7 +517,7 @@ async fn process_geometry(request: &mut Request, texture_bindings: &[texture::Te
     let mut union_count = 0;
     let mut primitive_count = 0;
 
-    let client = reqwest::Client::builder().user_agent("PA Combine").timeout(Duration::from_secs(20)).redirect(reqwest::redirect::Policy::limited(5)).build().unwrap_or_default();
+    let client = reqwest::Client::builder().user_agent("PA Combine").timeout(Duration::from_secs(120)).redirect(reqwest::redirect::Policy::none()).build().unwrap_or_default();
     let mut asset_mesh_cache = HashMap::<String, std::result::Result<filemesh::FileMeshData, String>>::new();
     let mut recovered_mesh_names = Vec::new();
     let mut failed_mesh_names = Vec::new();
@@ -511,13 +539,7 @@ async fn process_geometry(request: &mut Request, texture_bindings: &[texture::Te
                 let url = format!("https://assetdelivery.roblox.com/v1/asset/?id={asset_id}");
                 let downloaded = async {
                     let cookie = studio_cookie().map_err(|error| error.to_string())?;
-                    let response = client.get(url)
-                        .header(reqwest::header::COOKIE, format!(".ROBLOSECURITY={cookie}"))
-                        .send().await.map_err(|error| error.to_string())?;
-                    if !response.status().is_success() {
-                        return Err(format!("AssetDelivery returned HTTP {}", response.status()));
-                    }
-                    let bytes = response.bytes().await.map_err(|error| error.to_string())?;
+                    let bytes = download_mesh_asset(&client, &asset_id, &cookie).await?;
                     filemesh::parse(&bytes)
                 }.await;
                 asset_mesh_cache.insert(asset_id.to_string(), downloaded);
