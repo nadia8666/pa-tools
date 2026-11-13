@@ -484,27 +484,27 @@ async fn download_mesh_asset(client: &reqwest::Client, asset_id: &str, cookie: &
     let response = client.get(url)
         .header(reqwest::header::COOKIE, format!(".ROBLOSECURITY={cookie}"))
         .send().await.map_err(|error| error.to_string())?;
-    let content_type = response.headers().get(reqwest::header::CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok()).unwrap_or("").to_owned();
-    if response.status().is_redirection() {
+    let response = if response.status().is_redirection() {
         let url = response.headers().get(reqwest::header::LOCATION)
             .ok_or_else(|| "AssetDelivery redirect omitted location".to_string())?
             .to_str().map_err(|error| error.to_string())?.to_owned();
-        return client.get(url).send().await.map_err(|error| error.to_string())?
-            .error_for_status().map_err(|error| error.to_string())?
-            .bytes().await.map(|bytes| bytes.to_vec()).map_err(|error| error.to_string());
-    }
+        client.get(url).send().await.map_err(|error| error.to_string())?
+    } else {
+        response
+    };
     let response = response.error_for_status().map_err(|error| error.to_string())?;
-    if content_type.contains("json") {
-        let payload = response.json::<serde_json::Value>().await.map_err(|error| error.to_string())?;
+    let bytes = response.bytes().await.map_err(|error| error.to_string())?;
+    let body = bytes.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(&bytes);
+    if body.first() == Some(&b'{') {
+        let payload = serde_json::from_slice::<serde_json::Value>(body).map_err(|error| error.to_string())?;
         let url = payload["locations"].as_array()
             .and_then(|locations| locations.iter().find_map(|location| location["location"].as_str()))
-            .ok_or_else(|| "AssetDelivery response omitted its download location".to_string())?;
+            .ok_or_else(|| format!("AssetDelivery response omitted its download location: {}", String::from_utf8_lossy(body)))?;
         return client.get(url).send().await.map_err(|error| error.to_string())?
             .error_for_status().map_err(|error| error.to_string())?
             .bytes().await.map(|bytes| bytes.to_vec()).map_err(|error| error.to_string());
     }
-    response.bytes().await.map(|bytes| bytes.to_vec()).map_err(|error| error.to_string())
+    Ok(bytes.to_vec())
 }
 
 async fn process_geometry(request: &mut Request, texture_bindings: &[texture::TextureBindingInfo], cancelled: &AtomicBool) -> GeometryResult {
