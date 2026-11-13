@@ -1359,6 +1359,10 @@ local function captureReplacementState(snapshot, models, meshParts)
 		state.parents[meshPart] = meshPart.Parent
 		state.names[meshPart] = meshPart.Name
 	end
+	for _, meshPart in snapshot.passthroughMeshParts do
+		state.parents[meshPart] = meshPart.Parent
+		state.names[meshPart] = meshPart.Name
+	end
 	for _, model in models do
 		state.parents[model] = model.Parent
 		state.names[model] = model.Name
@@ -1582,6 +1586,9 @@ local function replaceSelection(snapshot, models, meshParts, sourceAssignments, 
 	local replacementState = captureReplacementState(snapshot, models, meshParts)
 	table.insert(replacementState.created, outputModel)
 	local succeeded, result = pcall(function()
+		for _, passthrough in snapshot.passthroughMeshParts do
+			passthrough.Parent = outputModel
+		end
 		for _, model in models do
 			for _, descendant in model:GetDescendants() do
 				if descendant:IsA("MeshPart") and meshPartSet[descendant] then
@@ -2290,11 +2297,16 @@ local function extractPrimitive(part, identity, assemblyId)
 end
 
 local function extractMeshPart(meshPart, identity, assemblyId)
-	local editableMesh = AssetService:CreateEditableMeshAsync(meshPart.MeshContent, {
-		FixedSize = false,
-	})
+	local ok, editableMesh = pcall(function()
+		return AssetService:CreateEditableMeshAsync(meshPart.MeshContent, {
+			FixedSize = false,
+		})
+	end)
+	if not ok then
+		error(string.format("Could not create an EditableMesh for %s: %s", meshPart:GetFullName(), tostring(editableMesh)))
+	end
 	if not editableMesh then
-		error("Roblox could not create an EditableMesh for " .. meshPart:GetFullName())
+		return nil
 	end
 	local ok, result = pcall(function()
 		editableMesh:Triangulate()
@@ -2576,6 +2588,7 @@ inspectButton.Activated:Connect(function()
 		local appearanceStates = captureAppearanceStates(roots)
 		local hierarchyStates = captureHierarchyStates(roots)
 		local meshInputs = {}
+		local passthroughMeshParts = {}
 		for index, meshPart in meshParts do
 			setStatus(string.format("Extracting MeshPart %d of %d: %s", index, #meshParts, meshPart.Name))
 			local ok, extracted =
@@ -2584,7 +2597,12 @@ inspectButton.Activated:Connect(function()
 				setStatus(tostring(extracted), colors.bad)
 				return
 			end
-			table.insert(meshInputs, extracted)
+			if extracted then
+				table.insert(meshInputs, extracted)
+			else
+				table.insert(passthroughMeshParts, meshPart)
+				geometryIdentity[meshPart] = nil
+			end
 		end
 		local primitiveInputs = {}
 		for index, part in primitives do
@@ -2692,7 +2710,20 @@ inspectButton.Activated:Connect(function()
 			sourceAssemblyAnchored = sourceAssemblyAnchored,
 			appearanceStates = appearanceStates,
 			hierarchyStates = hierarchyStates,
-			geometry = geometrySources,
+			geometry = (function()
+				local sources = {}
+				local passthrough = {}
+				for _, source in passthroughMeshParts do
+					passthrough[source] = true
+				end
+				for _, source in geometrySources do
+					if not passthrough[source] then
+						table.insert(sources, source)
+					end
+				end
+				return sources
+			end)(),
+			passthroughMeshParts = passthroughMeshParts,
 			sourceIdentity = sourceIdentity,
 			sourceStates = sourceStates,
 		}
