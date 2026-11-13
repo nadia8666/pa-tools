@@ -1649,6 +1649,18 @@ local function replaceSelection(snapshot, models, meshParts, sourceAssignments, 
 end
 
 local function getFirstProcessingError(response)
+	local failedMeshNames = {}
+	for _, name in response.failedMeshNames or {} do
+		failedMeshNames[name] = true
+	end
+	local function isFailedMeshError(name)
+		for failedName in failedMeshNames do
+			if name == failedName or string.sub(name, 1, #failedName + 1) == failedName .. "." then
+				return true
+			end
+		end
+		return false
+	end
 	for _, errors in
 		{
 			response.sourceErrors or {},
@@ -1656,8 +1668,10 @@ local function getFirstProcessingError(response)
 			response.overlayErrors or {},
 		}
 	do
-		if #errors > 0 then
-			return string.format("%s: %s", errors[1].name, errors[1].error)
+		for _, issue in errors do
+			if not isFailedMeshError(issue.name) then
+				return string.format("%s: %s", issue.name, issue.error)
+			end
 		end
 	end
 	return nil

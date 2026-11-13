@@ -416,6 +416,7 @@ async fn process_geometry(request: &mut Request, texture_bindings: &[texture::Te
     let mut recovered_mesh_names = Vec::new();
     let mut failed_mesh_names = Vec::new();
     let mut recovered_mesh_data = HashMap::<String, filemesh::FileMeshData>::new();
+    let mut failed_asset_ids = BTreeSet::new();
     let fallback_asset_ids: BTreeSet<String> = mesh_inputs.iter()
         .filter(|input| input.positions.is_empty())
         .filter_map(|input| input.mesh_asset_id.as_deref())
@@ -447,6 +448,7 @@ async fn process_geometry(request: &mut Request, texture_bindings: &[texture::Te
                 }
                 _ => {
                     failed_mesh_names.push(input.name.clone());
+                    failed_asset_ids.insert(asset_id.clone());
                     continue;
                 }
             }
@@ -488,7 +490,12 @@ async fn process_geometry(request: &mut Request, texture_bindings: &[texture::Te
     }
 
     for input in request.mesh_inputs.as_mut().into_iter().flatten() {
-        if let Some(data) = recovered_mesh_data.remove(&input.name) {
+        if input.mesh_asset_id.as_deref().and_then(asset_id_from_uri).is_some_and(|id| failed_asset_ids.contains(&id)) {
+            input.positions.clear();
+            input.normals.clear();
+            input.uvs.clear();
+            input.colors.clear();
+        } else if let Some(data) = recovered_mesh_data.remove(&input.name) {
             input.positions = data.positions;
             input.normals = data.normals;
             input.uvs = data.uvs;
