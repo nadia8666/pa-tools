@@ -1765,7 +1765,13 @@ local function onMessage(message)
 	end
 	for _, name in response.failedMeshNames or {} do
 		local detail = response.meshRecoveryErrors and response.meshRecoveryErrors[name]
-		warn(string.format("[PA Combine] preserving %s because its mesh asset could not be recovered%s", name, detail and ": " .. detail or ""))
+		warn(
+			string.format(
+				"[PA Combine] preserving %s because its mesh asset could not be recovered%s",
+				name,
+				detail and ": " .. detail or ""
+			)
+		)
 	end
 	if response.mergedVertexCount then
 		selectionStats.Text = string.format(
