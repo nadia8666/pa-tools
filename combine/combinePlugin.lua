@@ -2534,19 +2534,6 @@ inspectButton.Activated:Connect(function()
 		)
 		return
 	end
-	for _, source in geometrySources do
-		local appearance = source:FindFirstChildOfClass("SurfaceAppearance")
-		if appearance and getContentUri(appearance.TexturePackContent) then
-			setStatus(
-				string.format(
-					"SurfaceAppearance texture packs are not supported yet: %s. No geometry was replaced.",
-					source:GetFullName()
-				),
-				colors.bad
-			)
-			return
-		end
-	end
 	if #meshParts > 0 or #unions > 0 or #primitives > 0 then
 		local roots = normalizeSelection(selected)
 		local sourceStates = {}
