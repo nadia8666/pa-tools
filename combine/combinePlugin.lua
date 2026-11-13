@@ -1750,6 +1750,9 @@ local function onMessage(message)
 	for _, issue in response.overlayErrors or {} do
 		warn(string.format("[PA Combine] overlay error: %s: %s", issue.name, issue.error))
 	end
+	for _, name in response.failedMeshNames or {} do
+		warn(string.format("[PA Combine] preserving %s because its mesh asset could not be recovered", name))
+	end
 	if response.mergedVertexCount then
 		selectionStats.Text = string.format(
 			"Merged %d MeshParts · %d unions · %d primitives · %d vertices · %d triangles",
@@ -2648,7 +2651,7 @@ inspectButton.Activated:Connect(function()
 				table.insert(passthroughMeshParts, meshPart)
 				table.insert(meshInputs, {
 					name = sourceIdentity[meshPart],
-					meshAssetId = meshPart.MeshId,
+					meshAssetId = getContentUri(meshPart.MeshContent) or meshPart.MeshId,
 					assemblyId = sourceAssemblyIdentity[meshPart],
 					castShadow = meshPart.CastShadow,
 					positions = {},
