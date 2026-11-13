@@ -157,9 +157,17 @@ fn decode_v2_v3(bytes: &[u8], version3: bool) -> Result<FileMeshData, String> {
     let faces = read_faces(&mut reader, face_count)?;
     let mut face_limit = face_count;
     if version3 && lod_count > 0 {
-        let first_lod = reader.u32()? as usize;
-        if first_lod > face_count { return Err("Invalid FileMesh LOD face offset".to_string()); }
-        face_limit = first_lod;
+        let mut offsets = Vec::with_capacity(lod_count);
+        for _ in 0..lod_count {
+            offsets.push(reader.u32()? as usize);
+        }
+        if offsets.first().copied() != Some(0) {
+            return Err("Invalid FileMesh LOD face offsets".to_string());
+        }
+        if let Some(main_mesh_end) = offsets.get(1) {
+            if *main_mesh_end > face_count { return Err("Invalid FileMesh main LOD face offset".to_string()); }
+            face_limit = *main_mesh_end;
+        }
     }
     expand_geometry(&vertices, &faces, face_limit)
 }
@@ -175,20 +183,55 @@ fn decode_v4_v5(bytes: &[u8], version5: bool) -> Result<FileMeshData, String> {
     let bone_names_size = reader.u32()? as usize;
     let subset_count = reader.u16()? as usize;
     reader.take(2)?;
-    if version5 { reader.take(8)?; }
+    let facs_data_size = if version5 {
+        reader.take(4)?;
+        reader.u32()? as usize
+    } else {
+        0
+    };
     if header_size < if version5 { 32 } else { 24 } {
         return Err("Invalid FileMesh v4/v5 header".to_string());
     }
+    if bone_count > 0 {
+        return Err("Skinned FileMesh assets cannot be merged as static geometry".to_string());
+    }
+    let skinning_size = if bone_count > 0 {
+        vertex_count.checked_mul(8).ok_or("FileMesh skinning size overflow")?
+    } else {
+        0
+    };
+    let fixed_size = skinning_size
+        .checked_add(face_count.checked_mul(12).ok_or("FileMesh face size overflow")?)
+        .and_then(|size| size.checked_add(lod_count.checked_mul(4)?))
+        .and_then(|size| size.checked_add(bone_count.checked_mul(60)?))
+        .and_then(|size| size.checked_add(bone_names_size))
+        .and_then(|size| size.checked_add(subset_count.checked_mul(72)?))
+        .and_then(|size| size.checked_add(facs_data_size))
+        .ok_or("FileMesh v4/v5 data size overflow")?;
+    let vertex_data_size = bytes.len().checked_sub(header_size)
+        .and_then(|size| size.checked_sub(fixed_size))
+        .ok_or("FileMesh v4/v5 vertex data exceeds the file size")?;
+    if vertex_count == 0 || vertex_data_size % vertex_count != 0 {
+        return Err("Invalid FileMesh v4/v5 vertex data size".to_string());
+    }
+    let vertex_stride = vertex_data_size / vertex_count;
     reader.offset = header_size;
-    let vertices = read_vertices(&mut reader, vertex_count, 40)?;
-    if bone_count > 0 { reader.take(vertex_count.checked_mul(8).ok_or("FileMesh skinning size overflow")?)?; }
+    let vertices = read_vertices(&mut reader, vertex_count, vertex_stride)?;
+    if bone_count > 0 { reader.take(skinning_size)?; }
     let faces = read_faces(&mut reader, face_count)?;
     let mut face_limit = face_count;
     if lod_count > 0 {
-        let first_lod = reader.u32()? as usize;
-        if first_lod > face_count { return Err("Invalid FileMesh LOD face offset".to_string()); }
-        face_limit = first_lod;
-        reader.take((lod_count - 1) * 4)?;
+        let mut offsets = Vec::with_capacity(lod_count);
+        for _ in 0..lod_count {
+            offsets.push(reader.u32()? as usize);
+        }
+        if offsets.first().copied() != Some(0) {
+            return Err("Invalid FileMesh LOD face offsets".to_string());
+        }
+        if let Some(main_mesh_end) = offsets.get(1) {
+            if *main_mesh_end > face_count { return Err("Invalid FileMesh main LOD face offset".to_string()); }
+            face_limit = *main_mesh_end;
+        }
     }
     reader.take(bone_count.checked_mul(60).ok_or("FileMesh bone data size overflow")?)?;
     reader.take(bone_names_size)?;
@@ -240,6 +283,9 @@ fn decode_chunked(bytes: &[u8], version7: bool) -> Result<FileMeshData, String> 
         let chunk_size = reader.u32()? as usize;
         let data = reader.take(chunk_size)?;
         let name = std::str::from_utf8(name).unwrap_or("").trim_matches(char::from(0));
+        if name == "SKINNING" {
+            return Err("Skinned FileMesh assets cannot be merged as static geometry".to_string());
+        }
         if name == "COREMESH" {
             if (version7 && chunk_version != 2) || (!version7 && chunk_version != 1) {
                 return Err(format!("Unsupported COREMESH chunk version {chunk_version}"));
@@ -249,7 +295,16 @@ fn decode_chunked(bytes: &[u8], version7: bool) -> Result<FileMeshData, String> 
             let mut lods = Reader::new(data);
             lods.take(3)?;
             let count = lods.count(1024)?;
-            if count > 0 { face_limit = Some(lods.u32()? as usize); }
+            let mut offsets = Vec::with_capacity(count);
+            for _ in 0..count {
+                offsets.push(lods.u32()? as usize);
+            }
+            if !offsets.is_empty() && offsets.first().copied() != Some(0) {
+                return Err("Invalid FileMesh LOD face offsets".to_string());
+            }
+            if let Some(main_mesh_end) = offsets.get(1) {
+                face_limit = Some(*main_mesh_end);
+            }
         }
     }
     let core = core.ok_or("FileMesh is missing its COREMESH chunk")?;
@@ -260,7 +315,20 @@ fn decode_chunked(bytes: &[u8], version7: bool) -> Result<FileMeshData, String> 
     } else {
         let mut core_reader = Reader::new(core);
         let vertex_count = core_reader.count(5_000_000)?;
-        let vertices = read_vertices(&mut core_reader, vertex_count, 40)?;
+        let mut vertex_stride = None;
+        for stride in [40usize, 36] {
+            let Some(face_count_offset) = vertex_count.checked_mul(stride).and_then(|size| size.checked_add(4)) else { continue; };
+            let Some(face_count_end) = face_count_offset.checked_add(4) else { continue; };
+            let Some(face_count_bytes) = core.get(face_count_offset..face_count_end) else { continue; };
+            let face_count = u32::from_le_bytes(face_count_bytes.try_into().unwrap()) as usize;
+            let Some(expected_size) = face_count.checked_mul(12).and_then(|size| face_count_end.checked_add(size)) else { continue; };
+            if face_count <= 5_000_000 && expected_size == core.len() {
+                vertex_stride = Some(stride);
+                break;
+            }
+        }
+        let vertex_stride = vertex_stride.ok_or("Invalid FileMesh v6 COREMESH vertex stride or face data")?;
+        let vertices = read_vertices(&mut core_reader, vertex_count, vertex_stride)?;
         let face_count = core_reader.count(5_000_000)?;
         let faces = read_faces(&mut core_reader, face_count)?;
         expand_geometry(&vertices, &faces, face_limit.unwrap_or(face_count))
@@ -322,6 +390,65 @@ mod tests {
         let mesh = parse(&bytes).unwrap();
         assert_eq!(mesh.positions.len(), 3);
         assert_eq!(mesh.positions[1], [1.0, 0.0, 0.0]);
+        assert_eq!(mesh.colors, vec![[1.0; 4]; 3]);
+    }
+}
+
+
+#[cfg(test)]
+mod lod_tests {
+    use super::*;
+
+    fn vertex_bytes() -> Vec<u8> {
+        let mut bytes = Vec::new();
+        for position in [[0.0f32, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]] {
+            for value in [position[0], position[1], position[2], 0.0, 0.0, 1.0, 0.0, 0.0] {
+                bytes.extend_from_slice(&value.to_le_bytes());
+            }
+            bytes.extend_from_slice(&[0; 4]);
+        }
+        bytes
+    }
+
+    #[test]
+    fn v3_uses_the_second_lod_offset_as_the_main_mesh_end() {
+        let mut bytes = b"version 3.00\n".to_vec();
+        bytes.extend_from_slice(&16u16.to_le_bytes());
+        bytes.extend_from_slice(&[36, 12]);
+        bytes.extend_from_slice(&4u16.to_le_bytes());
+        bytes.extend_from_slice(&2u16.to_le_bytes());
+        bytes.extend_from_slice(&3u32.to_le_bytes());
+        bytes.extend_from_slice(&2u32.to_le_bytes());
+        bytes.extend_from_slice(&vertex_bytes());
+        for face in [[0u32, 1, 2], [0, 2, 1]] {
+            for index in face {
+                bytes.extend_from_slice(&index.to_le_bytes());
+            }
+        }
+        bytes.extend_from_slice(&0u32.to_le_bytes());
+        bytes.extend_from_slice(&1u32.to_le_bytes());
+        let mesh = parse(&bytes).unwrap();
+        assert_eq!(mesh.positions.len(), 3);
+    }
+
+    #[test]
+    fn v4_infers_the_optional_color_vertex_stride() {
+        let mut bytes = b"version 4.00\n".to_vec();
+        bytes.extend_from_slice(&24u16.to_le_bytes());
+        bytes.extend_from_slice(&0u16.to_le_bytes());
+        bytes.extend_from_slice(&3u32.to_le_bytes());
+        bytes.extend_from_slice(&1u32.to_le_bytes());
+        bytes.extend_from_slice(&0u16.to_le_bytes());
+        bytes.extend_from_slice(&0u16.to_le_bytes());
+        bytes.extend_from_slice(&0u32.to_le_bytes());
+        bytes.extend_from_slice(&0u16.to_le_bytes());
+        bytes.extend_from_slice(&[0, 0]);
+        bytes.extend_from_slice(&vertex_bytes());
+        for index in [0u32, 1, 2] {
+            bytes.extend_from_slice(&index.to_le_bytes());
+        }
+        let mesh = parse(&bytes).unwrap();
+        assert_eq!(mesh.positions.len(), 3);
         assert_eq!(mesh.colors, vec![[1.0; 4]; 3]);
     }
 }
