@@ -300,6 +300,7 @@ struct Response {
     overlay_errors: Option<Vec<overlay::OverlayError>>,
     recovered_mesh_names: Option<Vec<String>>,
     failed_mesh_names: Option<Vec<String>>,
+    mesh_recovery_errors: Option<HashMap<String, String>>,
 }
 
 fn empty_response(id: u64, error: impl Into<String>) -> Response {
@@ -333,6 +334,7 @@ fn empty_response(id: u64, error: impl Into<String>) -> Response {
         overlay_errors: None,
         recovered_mesh_names: None,
         failed_mesh_names: None,
+        mesh_recovery_errors: None,
     }
 }
 
@@ -399,6 +401,7 @@ struct GeometryResult {
     errors: Vec<SourceError>,
     recovered_mesh_names: Vec<String>,
     failed_mesh_names: Vec<String>,
+    mesh_recovery_errors: HashMap<String, String>,
 }
 
 async fn process_geometry(request: &mut Request, texture_bindings: &[texture::TextureBindingInfo], cancelled: &AtomicBool) -> GeometryResult {
@@ -415,6 +418,7 @@ async fn process_geometry(request: &mut Request, texture_bindings: &[texture::Te
     let mut asset_mesh_cache = HashMap::<String, std::result::Result<filemesh::FileMeshData, String>>::new();
     let mut recovered_mesh_names = Vec::new();
     let mut failed_mesh_names = Vec::new();
+    let mut mesh_recovery_errors = HashMap::new();
     let mut recovered_mesh_data = HashMap::<String, filemesh::FileMeshData>::new();
     let mut failed_asset_ids = BTreeSet::new();
     let fallback_asset_ids: BTreeSet<String> = mesh_inputs.iter()
@@ -446,8 +450,15 @@ async fn process_geometry(request: &mut Request, texture_bindings: &[texture::Te
                     recovered_mesh_data.insert(input.name.clone(), data.clone());
                     Some(data.clone())
                 }
-                _ => {
+                Some(Err(error)) => {
                     failed_mesh_names.push(input.name.clone());
+                    mesh_recovery_errors.insert(input.name.clone(), format!("AssetDelivery/FileMesh recovery failed for asset {asset_id}: {error}"));
+                    failed_asset_ids.insert(asset_id.clone());
+                    continue;
+                }
+                None => {
+                    failed_mesh_names.push(input.name.clone());
+                    mesh_recovery_errors.insert(input.name.clone(), format!("AssetDelivery/FileMesh recovery result missing for asset {asset_id}"));
                     failed_asset_ids.insert(asset_id.clone());
                     continue;
                 }
@@ -455,6 +466,7 @@ async fn process_geometry(request: &mut Request, texture_bindings: &[texture::Te
         } else {
             if input.positions.is_empty() {
                 failed_mesh_names.push(input.name.clone());
+                mesh_recovery_errors.insert(input.name.clone(), "MeshPart has no readable mesh asset ID".to_string());
                 continue;
             }
             None
@@ -583,6 +595,7 @@ async fn process_geometry(request: &mut Request, texture_bindings: &[texture::Te
         errors,
         recovered_mesh_names,
         failed_mesh_names,
+        mesh_recovery_errors,
     }
 }
 
@@ -1658,6 +1671,7 @@ async fn process_request(request: &mut Request, progress: &mpsc::UnboundedSender
             let source_errors = result.errors;
             let recovered_mesh_names = result.recovered_mesh_names;
             let failed_mesh_names = result.failed_mesh_names;
+            let mesh_recovery_errors = result.mesh_recovery_errors;
             let ok = error.is_none();
             let message = if geometry_assets.is_some() {
                 format!("Merged {success_count} sources into {} independently uploadable mesh assets.", geometry_assets.as_ref().map_or(0, Vec::len))
@@ -1704,6 +1718,7 @@ async fn process_request(request: &mut Request, progress: &mpsc::UnboundedSender
                 overlay_errors: Some(overlay_errors),
                 recovered_mesh_names: Some(recovered_mesh_names),
                 failed_mesh_names: Some(failed_mesh_names),
+                mesh_recovery_errors: Some(mesh_recovery_errors),
             }
         }
         _ => empty_response(request.id, format!("Unsupported request type: {}", request.request_type)),
