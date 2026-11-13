@@ -372,6 +372,7 @@ fn inspect(request: &Request) -> Response {
         overlay_errors: None,
         recovered_mesh_names: None,
         failed_mesh_names: None,
+        mesh_recovery_errors: None,
     }
 }
 
