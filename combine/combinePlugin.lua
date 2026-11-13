@@ -2390,7 +2390,7 @@ local function extractMeshPart(meshPart, identity, assemblyId)
 		local size = meshPart.Size
 		return {
 			name = identity,
-			meshAssetId = getContentUri(meshPart.MeshContent) or meshPart.MeshId,
+			meshAssetId = meshPart.MeshId ~= "" and meshPart.MeshId or getContentUri(meshPart.MeshContent),
 			assemblyId = assemblyId,
 			castShadow = meshPart.CastShadow,
 			positions = positions,
@@ -2651,7 +2651,7 @@ inspectButton.Activated:Connect(function()
 				table.insert(passthroughMeshParts, meshPart)
 				table.insert(meshInputs, {
 					name = sourceIdentity[meshPart],
-					meshAssetId = getContentUri(meshPart.MeshContent) or meshPart.MeshId,
+					meshAssetId = meshPart.MeshId ~= "" and meshPart.MeshId or getContentUri(meshPart.MeshContent),
 					assemblyId = sourceAssemblyIdentity[meshPart],
 					castShadow = meshPart.CastShadow,
 					positions = {},
