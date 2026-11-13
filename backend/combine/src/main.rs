@@ -401,7 +401,7 @@ struct GeometryResult {
     failed_mesh_names: Vec<String>,
 }
 
-async fn process_geometry(request: &Request, texture_bindings: &[texture::TextureBindingInfo], cancelled: &AtomicBool) -> GeometryResult {
+async fn process_geometry(request: &mut Request, texture_bindings: &[texture::TextureBindingInfo], cancelled: &AtomicBool) -> GeometryResult {
     let mesh_inputs = request.mesh_inputs.as_deref().unwrap_or_default();
     let union_inputs = request.union_inputs.as_deref().unwrap_or_default();
     let primitive_inputs = request.primitive_inputs.as_deref().unwrap_or_default();
@@ -415,6 +415,7 @@ async fn process_geometry(request: &Request, texture_bindings: &[texture::Textur
     let mut asset_mesh_cache = HashMap::<String, std::result::Result<filemesh::FileMeshData, String>>::new();
     let mut recovered_mesh_names = Vec::new();
     let mut failed_mesh_names = Vec::new();
+    let mut recovered_mesh_data = HashMap::<String, filemesh::FileMeshData>::new();
     let fallback_asset_ids: BTreeSet<String> = mesh_inputs.iter()
         .filter(|input| input.positions.is_empty())
         .filter_map(|input| input.mesh_asset_id.as_deref())
@@ -441,6 +442,7 @@ async fn process_geometry(request: &Request, texture_bindings: &[texture::Textur
             match asset_mesh_cache.get(&asset_id) {
                 Some(Ok(data)) => {
                     recovered_mesh_names.push(input.name.clone());
+                    recovered_mesh_data.insert(input.name.clone(), data.clone());
                     Some(data.clone())
                 }
                 _ => {
@@ -482,6 +484,15 @@ async fn process_geometry(request: &Request, texture_bindings: &[texture::Textur
         match result {
             Ok(()) => mesh_count += 1,
             Err(error) => errors.push(SourceError { name: input.name.clone(), error }),
+        }
+    }
+
+    for input in request.mesh_inputs.as_mut().into_iter().flatten() {
+        if let Some(data) = recovered_mesh_data.remove(&input.name) {
+            input.positions = data.positions;
+            input.normals = data.normals;
+            input.uvs = data.uvs;
+            input.colors = data.colors;
         }
     }
 
@@ -654,6 +665,9 @@ async fn append_meshpart_overlays(
             });
             continue;
         };
+        if source.positions.is_empty() {
+            continue;
+        }
         if !tiles.iter().any(|tile| tile.name == surface.name && tile.slot == "color" && !!tile.has_source) {
             errors.push(overlay::OverlayError {
                 name: surface.name.clone(),
