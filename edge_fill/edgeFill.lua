@@ -485,7 +485,7 @@ local function getLengthAxis(part)
 	return "Z"
 end
 
-local function makeFence(edge, outward, normal)
+local function makeFence(edge, outward, normal, mirrorSide, part)
 	local clone = clonePart(referencePart)
 	local axis = getLengthAxis(referencePart)
 	local size = clone.Size
@@ -502,6 +502,9 @@ local function makeFence(edge, outward, normal)
 	clone.Size = size
 	local halfHeight = if axis == "X" then size.Y / 2 else size.X / 2
 	local position = (edge.first + edge.second) / 2 - outward * (size.Z / 2) + normal * halfHeight
+	if mirrorSide then
+		position += part.CFrame.RightVector * part.Size.X
+	end
 	clone.CFrame = getFenceFrame(position, edge.tangent, outward, normal, axis)
 	clone.CanQuery = false
 	clone.Archivable = false
@@ -573,7 +576,8 @@ local function buildPreview()
 								outward,
 								loop.normal,
 								(isWedge(part) or isCornerWedge(part))
-									and part.CFrame:VectorToObjectSpace(loop.normal).X < 0
+									and part.CFrame:VectorToObjectSpace(loop.normal).X < 0,
+								part
 							)
 								previewSources[previewParts[#previewParts]] = part.Parent
 							else
