@@ -44,7 +44,7 @@ jobs:
             cargo fmt --manifest-path "$manifest"
           done
 
-          mapfile -t luau_files < <(find combine district_mapper hole_cutter pa_tools sync_plugin world_selector -type f \( -name '*.lua' -o -name '*.luau' \) | sort)
+          mapfile -t luau_files < <(find combine district_mapper edge_fill hole_cutter pa_tools sync_plugin world_selector -type f \( -name '*.lua' -o -name '*.luau' \) | sort)
 
           if [[ ${#luau_files[@]} -eq 0 ]]; then
             echo "no plugin source files found"
