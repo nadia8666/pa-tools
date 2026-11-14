@@ -329,8 +329,6 @@ end
 local function getSurfaceLoops(part, worldNormal)
 	if part:IsA("Part") and part.Shape == Enum.PartType.Cylinder then
 		local localNormal = part.CFrame:VectorToObjectSpace(worldNormal)
-		local axis = part.CFrame.RightVector
-		local loops = {}
 		local function makeRing(x)
 			local vertices = {}
 			for index = 0, 19 do
@@ -479,7 +477,7 @@ local function makeTrim(edge, inward, normal, part)
 		else
 			surfaceAlignment = CFrame.fromMatrix(Vector3.zero, targetBack, targetUp, -targetRight)
 		end
-		baseFrame = CFrame.new(sourcePart.Position) * surfaceAlignment.Rotation
+		baseFrame = CFrame.new(part.Position) * surfaceAlignment.Rotation
 	end
 	clone.CFrame = CFrame.new(edgeCenter) * baseFrame.Rotation
 	if deletingInwardTextures then
@@ -645,6 +643,14 @@ local function beginPlacement()
 		surfaceHighlight.Archivable = false
 		surfaceHighlight.Parent = folder
 	end
+	table.clear(selectedSurfaces)
+	sourcePart = nil
+	for _, connection in surfaceConnections do
+		connection:Disconnect()
+	end
+	table.clear(surfaceConnections)
+	clearPreview()
+	multiSelecting = false
 	placing = true
 	plugin:Activate(true)
 	updateSurfaceHighlight()
