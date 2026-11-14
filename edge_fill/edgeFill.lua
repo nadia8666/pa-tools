@@ -153,7 +153,8 @@ local function makeInput(labelText, initialValue, order)
 		ClearTextOnFocus = false,
 		LayoutOrder = order + 1,
 	}, root)
-	create("UICorner", { CornerRadius = UDim.new(0, 6) }, input)\n\tcreate("UIStroke", { Color = COLORS.stroke, Thickness = 1, Transparency = 0.65 }, input)
+	create("UICorner", { CornerRadius = UDim.new(0, 6) }, input)
+	create("UIStroke", { Color = COLORS.stroke, Thickness = 1, Transparency = 0.65 }, input)
 	return input, label
 end
 
