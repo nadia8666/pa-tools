@@ -252,6 +252,11 @@ local function makeFaces(part)
 	local x, y, z = half.X, half.Y, half.Z
 	local faces = {}
 	local function add(vertices)
+		if isWedge(part) or isCornerWedge(part) then
+			for index, vertex in vertices do
+				vertices[index] = Vector3.new(vertex.X, vertex.Y, -vertex.Z)
+			end
+		end
 		table.insert(faces, vertices)
 	end
 	if isWedge(part) then
@@ -438,13 +443,12 @@ local function getOutward(edge, center, normal)
 	return -inward.Unit, inward.Unit
 end
 
-local function getFenceFrame(position, tangent, outward, normal, lengthAxis, mirrorLook)
-	local direction = if mirrorLook then -1 else 1
+local function getFenceFrame(position, tangent, outward, normal, lengthAxis)
 	if lengthAxis == "Y" then
 		local up = tangent
 		local right = normal
 		local back = right:Cross(up).Unit
-		if back:Dot(outward) * direction < 0 then
+		if back:Dot(outward) < 0 then
 			up = -up
 			back = -back
 		end
@@ -453,7 +457,7 @@ local function getFenceFrame(position, tangent, outward, normal, lengthAxis, mir
 	local right = tangent
 	local up = normal
 	local back = right:Cross(up).Unit
-	if back:Dot(outward) * direction < 0 then
+	if back:Dot(outward) < 0 then
 		right = -right
 		back = -back
 	end
@@ -481,7 +485,7 @@ local function getLengthAxis(part)
 	return "Z"
 end
 
-local function makeFence(edge, outward, normal, mirrorLook)
+local function makeFence(edge, outward, normal)
 	local clone = clonePart(referencePart)
 	local axis = getLengthAxis(referencePart)
 	local size = clone.Size
@@ -497,8 +501,8 @@ local function makeFence(edge, outward, normal, mirrorLook)
 	end
 	clone.Size = size
 	local halfHeight = if axis == "X" then size.Y / 2 else size.X / 2
-	local position = (edge.first + edge.second) / 2 + outward * (size.Z / 2 * (if mirrorLook then 1 else -1)) + normal * halfHeight
-	clone.CFrame = getFenceFrame(position, edge.tangent, outward, normal, axis, mirrorLook)
+	local position = (edge.first + edge.second) / 2 - outward * (size.Z / 2) + normal * halfHeight
+	clone.CFrame = getFenceFrame(position, edge.tangent, outward, normal, axis)
 	clone.CanQuery = false
 	clone.Archivable = false
 	clone.Parent = getPreviewFolder()
