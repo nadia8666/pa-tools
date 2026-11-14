@@ -1,6 +1,7 @@
 local ChangeHistoryService = game:GetService("ChangeHistoryService")
 local Selection = game:GetService("Selection")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 if not RunService:IsEdit() then
 	return
@@ -38,6 +39,10 @@ local mode = "fence"
 local updateModeVisibility
 local refreshPreview
 local sourcePart
+local selectedSurfaces = {}
+local previewSources = {}
+local multiSelecting = false
+local surfaceHighlight
 local referencePart
 local surfaceNormal
 local surfaceLocalNormal
@@ -185,6 +190,7 @@ local function clearPreview()
 		part:Destroy()
 	end
 	table.clear(previewParts)
+	table.clear(previewSources)
 end
 
 local function getPreviewFolder()
@@ -267,8 +273,8 @@ local function getSurfacePolygon(part, worldNormal)
 		end
 		local vertices = {}
 		local sign = if localNormal.X >= 0 then 1 else -1
-		for index = 0, 31 do
-			local angle = index / 32 * math.pi * 2
+		for index = 0, 19 do
+			local angle = index / 20 * math.pi * 2
 			table.insert(
 				vertices,
 				part.CFrame:PointToWorldSpace(
@@ -310,7 +316,7 @@ local function getSurfacePolygon(part, worldNormal)
 			selected = vertices
 		end
 	end
-	if not selected then
+	if not selected or selectedDot < 0.9 then
 		return nil
 	end
 	local result = {}
@@ -327,8 +333,8 @@ local function getSurfaceLoops(part, worldNormal)
 		local loops = {}
 		local function makeRing(x)
 			local vertices = {}
-			for index = 0, 31 do
-				local angle = index / 32 * math.pi * 2
+			for index = 0, 19 do
+				local angle = index / 20 * math.pi * 2
 				table.insert(
 					vertices,
 					part.CFrame:PointToWorldSpace(
@@ -346,10 +352,7 @@ local function getSurfaceLoops(part, worldNormal)
 				},
 			}
 		end
-		for _, sign in { -1, 1 } do
-			table.insert(loops, { vertices = makeRing(sign * part.Size.X / 2), normal = axis })
-		end
-		return loops
+		return nil
 	end
 	local vertices = getSurfacePolygon(part, worldNormal)
 	if not vertices then
@@ -445,13 +448,13 @@ local function makeFence(edge, outward, normal)
 	table.insert(previewParts, clone)
 end
 
-local function makeTrim(edge, inward, normal)
-	local clone = clonePart(sourcePart)
+local function makeTrim(edge, inward, normal, part)
+	local clone = clonePart(part)
 	local size
-	local localTangent = sourcePart.CFrame:VectorToObjectSpace(edge.tangent)
+	local localTangent = part.CFrame:VectorToObjectSpace(edge.tangent)
 	local lengthAxis = if math.abs(localTangent.X) >= math.abs(localTangent.Z) then "X" else "Z"
 	local length = edge.length - 2 * inset
-	local sourceTangent = sourcePart.CFrame:VectorToObjectSpace(edge.tangent)
+	local sourceTangent = part.CFrame:VectorToObjectSpace(edge.tangent)
 	if math.abs(sourceTangent.Z) > math.abs(sourceTangent.X) then
 		length -= 2 * width
 	end
@@ -465,9 +468,9 @@ local function makeTrim(edge, inward, normal)
 		size = Vector3.new(width, height, length)
 	end
 	clone.Size = size
-	local baseFrame = sourcePart.CFrame
+	local baseFrame = part.CFrame
 	local surfaceAlignment = CFrame.identity
-	if sourcePart:IsA("WedgePart") then
+	if part:IsA("WedgePart") then
 		local targetUp = normal
 		local targetRight = edge.tangent
 		local targetBack = targetRight:Cross(targetUp).Unit
@@ -486,30 +489,30 @@ local function makeTrim(edge, inward, normal)
 	clone.Archivable = false
 	clone.Parent = getPreviewFolder()
 	table.insert(previewParts, clone)
+	previewSources[clone] = part.Parent
 end
 
 local function buildPreview()
 	clearPreview()
-	if not sourcePart or (mode == "fence" and not referencePart) or not surfaceLoops or not surfaceNormal then
-		return
-	end
-	if
-		mode == "trim"
-		and not (sourcePart:IsA("WedgePart") or sourcePart:IsA("Part") and sourcePart.Shape == Enum.PartType.Block)
-	then
-		setStatus("Trim supports block and wedge surfaces.", COLORS.bad)
+	if #selectedSurfaces == 0 or (mode == "fence" and not referencePart) then
 		return
 	end
 	local ok, err = pcall(function()
-		for _, loop in surfaceLoops do
-			local center = getCentroid(loop.vertices)
-			for _, edge in getEdges(loop.vertices) do
-				local outward, inward = getOutward(edge, center, loop.normal)
-				if outward and inward then
-					if mode == "fence" then
-						makeFence(edge, outward, loop.normal)
-					else
-						makeTrim(edge, inward, loop.normal)
+		for _, surface in selectedSurfaces do
+			local part = surface.part
+			if part.Parent then
+				for _, loop in surface.loops do
+					local center = getCentroid(loop.vertices)
+					for _, edge in getEdges(loop.vertices) do
+						local outward, inward = getOutward(edge, center, loop.normal)
+						if outward and inward then
+							if mode == "fence" then
+								makeFence(edge, outward, loop.normal)
+								previewSources[previewParts[#previewParts]] = part.Parent
+							else
+								makeTrim(edge, inward, loop.normal, part)
+							end
+						end
 					end
 				end
 			end
@@ -519,7 +522,7 @@ local function buildPreview()
 		clearPreview()
 		setStatus("Preview failed: " .. tostring(err), COLORS.bad)
 	else
-		setStatus(string.format("%d edge pieces previewed. Adjust settings, then apply.", #previewParts), COLORS.ok)
+		setStatus(string.format("%d edge pieces previewed across %d surfaces. Adjust settings, then apply.", #previewParts, #selectedSurfaces), COLORS.ok)
 	end
 end
 
@@ -534,22 +537,28 @@ local function parseNumber(input, fallback, allowNegative)
 	return value
 end
 
-	local refreshSurface = function()
-		if sourcePart and sourcePart.Parent and surfaceLocalNormal then
-			surfaceNormal = sourcePart.CFrame:VectorToWorldSpace(surfaceLocalNormal).Unit
-			surfaceLoops = getSurfaceLoops(sourcePart, surfaceNormal)
+local refreshSurface = function()
+	for _, surface in selectedSurfaces do
+		if surface.part.Parent then
+			surface.normal = surface.part.CFrame:VectorToWorldSpace(surface.localNormal).Unit
+			surface.loops = getSurfaceLoops(surface.part, surface.normal)
+		else
+			surface.loops = nil
 		end
 	end
+end
 
 refreshPreview = function()
-	if not sourcePart or not surfaceLoops then
+	if #selectedSurfaces == 0 then
 		return
 	end
 	refreshSurface()
-	if not surfaceLoops or #surfaceLoops == 0 then
-		clearPreview()
-		setStatus("The selected surface is no longer valid.", COLORS.bad)
-		return
+	for _, surface in selectedSurfaces do
+		if not surface.loops or #surface.loops == 0 then
+			clearPreview()
+			setStatus("A selected surface is no longer valid.", COLORS.bad)
+			return
+		end
 	end
 	if mode == "fence" and not referencePart then
 		clearPreview()
@@ -612,7 +621,8 @@ local function updateSurfaceHighlight()
 			or part:IsA("CornerWedgePart")
 			or part:IsA("Part")
 				and (part.Shape == Enum.PartType.Block or part.Shape == Enum.PartType.Cylinder)
-		if supported and (mode ~= "trim" or part:IsA("WedgePart") or part:IsA("Part") and part.Shape == Enum.PartType.Block) then
+		local loops = if supported then getSurfaceLoops(part, ray.Normal) else nil
+		if loops and #loops > 0 and (mode ~= "trim" or part:IsA("WedgePart") or part:IsA("Part") and part.Shape == Enum.PartType.Block) then
 			surfaceHighlight.Adornee = part
 			surfaceHighlight.TargetSurface = getSurfaceNormalId(part, ray.Normal)
 			return
@@ -644,48 +654,54 @@ end
 local function selectSurface()
 	local ray = workspace:Raycast(mouse.UnitRay.Origin, mouse.UnitRay.Direction * 1000)
 	if not ray or not ray.Instance:IsA("BasePart") then
-		return
+		return false
 	end
 	local part = ray.Instance
 	local supported = part:IsA("WedgePart")
 		or part:IsA("CornerWedgePart")
 		or part:IsA("Part") and (part.Shape == Enum.PartType.Block or part.Shape == Enum.PartType.Cylinder)
 	if not supported then
-		setStatus("Fence supports blocks, wedges, corner wedges, and cylinders.", COLORS.bad)
-		return
-	end
-	local loops = getSurfaceLoops(part, ray.Normal)
-	if not loops or #loops == 0 or #loops[1].vertices < 3 then
-		setStatus("This surface is not supported.", COLORS.bad)
-		return
+		setStatus("Fence supports block, wedge, corner wedge, and cylinder end-cap surfaces.", COLORS.bad)
+		return false
 	end
 	if mode == "trim" and not (part:IsA("WedgePart") or part:IsA("Part") and part.Shape == Enum.PartType.Block) then
 		setStatus("Trim supports block and wedge surfaces only.", COLORS.bad)
-		return
+		return false
 	end
-	for _, connection in surfaceConnections do
-		connection:Disconnect()
+	local localNormal = part.CFrame:VectorToObjectSpace(ray.Normal)
+	local normal = part.CFrame:VectorToWorldSpace(localNormal).Unit
+	local loops = getSurfaceLoops(part, normal)
+	if not loops or #loops == 0 or #loops[1].vertices < 3 then
+		setStatus("This face is not supported. Cylinder side faces cannot be selected.", COLORS.bad)
+		return false
 	end
-	table.clear(surfaceConnections)
-	sourcePart = part
-	surfaceLocalNormal = part.CFrame:VectorToObjectSpace(ray.Normal)
-	surfaceNormal = part.CFrame:VectorToWorldSpace(surfaceLocalNormal).Unit
-	surfaceLoops = getSurfaceLoops(part, surfaceNormal)
+	for _, surface in selectedSurfaces do
+		if surface.part == part and surface.localNormal:Dot(localNormal) > 0.99 then
+			setStatus("That surface is already selected.", COLORS.warn)
+			return false
+		end
+	end
+	table.insert(selectedSurfaces, {
+		part = part,
+		localNormal = localNormal,
+		normal = normal,
+		loops = loops,
+	})
+	sourcePart = selectedSurfaces[1].part
 	for _, property in { "Size", "CFrame" } do
-		table.insert(surfaceConnections, part:GetPropertyChangedSignal(property):Connect(function()
-			refreshPreview()
-		end))
+		table.insert(surfaceConnections, part:GetPropertyChangedSignal(property):Connect(refreshPreview))
 	end
 	refreshPreview()
+	return true
 end
 
 local function apply()
-	if not sourcePart or (mode == "fence" and not referencePart) or not surfaceLoops or #previewParts == 0 then
-		setStatus("Select a supported surface and preview edge pieces before applying.", COLORS.bad)
+	if #selectedSurfaces == 0 or (mode == "fence" and not referencePart) or #previewParts == 0 then
+		setStatus("Select supported surfaces and preview edge pieces before applying.", COLORS.bad)
 		return
 	end
-	if not sourcePart.Parent or (mode == "fence" and not referencePart.Parent) then
-		setStatus("The source or reference part no longer exists.", COLORS.bad)
+	if (mode == "fence" and not referencePart.Parent) then
+		setStatus("The reference part no longer exists.", COLORS.bad)
 		return
 	end
 	local recording = ChangeHistoryService:TryBeginRecording("EdgeFill_Apply", "Apply Edge Fill")
@@ -698,7 +714,7 @@ local function apply()
 		for _, preview in previewParts do
 			local clone = clonePart(preview)
 			clone.CanQuery = if mode == "fence" then referencePart.CanQuery else sourcePart.CanQuery
-			clone.Parent = sourcePart.Parent
+			clone.Parent = previewSources[preview] or sourcePart.Parent
 			table.insert(outputs, clone)
 		end
 	end)
@@ -713,10 +729,8 @@ local function apply()
 	ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
 	clearPreview()
 	sourcePart = nil
+	table.clear(selectedSurfaces)
 	referencePart = nil
-	surfaceNormal = nil
-	surfaceLocalNormal = nil
-	surfaceLoops = nil
 	for _, connection in surfaceConnections do
 		connection:Disconnect()
 	end
@@ -751,17 +765,50 @@ connect(mouse.Move, updateSurfaceHighlight)
 
 connect(mouse.Button1Down, function()
 	if placing and widget.Enabled then
-		placing = false
-		if surfaceHighlight then
-			surfaceHighlight.Adornee = nil
+		local shiftHeld = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
+		if not multiSelecting and not shiftHeld then
+			table.clear(selectedSurfaces)
+			for _, connection in surfaceConnections do
+				connection:Disconnect()
+			end
+			table.clear(surfaceConnections)
 		end
-		selectSurface()
+		local selected = selectSurface()
+		if not selected then
+			return
+		end
+		if shiftHeld then
+			multiSelecting = true
+			setStatus(string.format("%d surfaces selected. Release Shift to finish selection.", #selectedSurfaces), COLORS.ok)
+		else
+			placing = false
+			if surfaceHighlight then
+				surfaceHighlight.Adornee = nil
+			end
+		end
+	end
+end)
+
+connect(UserInputService.InputEnded, function(input)
+	if multiSelecting and (input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift) then
+		local leftHeld = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
+		local rightHeld = UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
+		if not leftHeld and not rightHeld then
+			multiSelecting = false
+			placing = false
+			if surfaceHighlight then
+				surfaceHighlight.Adornee = nil
+			end
+			refreshPreview()
+			setStatus(string.format("%d surfaces selected. Adjust settings, then apply.", #selectedSurfaces), COLORS.ok)
+		end
 	end
 end)
 
 connect(plugin.Deactivation, function()
 	if placing then
 		placing = false
+		multiSelecting = false
 		setStatus("Surface selection paused because another Studio tool was activated.")
 	end
 end)
@@ -789,6 +836,7 @@ connect(widget:GetPropertyChangedSignal("Enabled"), function()
 	toggleButton:SetActive(widget.Enabled)
 	if not widget.Enabled then
 		placing = false
+		multiSelecting = false
 		if surfaceHighlight then
 			surfaceHighlight.Adornee = nil
 		end
@@ -802,6 +850,7 @@ connect(plugin.Unloading, function()
 	toolbarCallbacks.edgeFill = nil
 	toolbar.removeButtonHandler("edgeFill")
 	placing = false
+	multiSelecting = false
 	if surfaceHighlight then
 		surfaceHighlight.Adornee = nil
 		surfaceHighlight:Destroy()
