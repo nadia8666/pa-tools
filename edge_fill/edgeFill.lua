@@ -7,13 +7,17 @@ if not RunService:IsEdit() then
 end
 
 local COLORS = {
-	bottom = Color3.fromRGB(22, 23, 30),
-	panel = Color3.fromRGB(22, 23, 27),
+	top = Color3.fromRGB(32, 34, 48),
+	bottom = Color3.fromRGB(16, 17, 23),
+	panel = Color3.fromRGB(40, 42, 58),
 	panelDark = Color3.fromRGB(22, 23, 32),
 	stroke = Color3.fromRGB(78, 82, 108),
 	text = Color3.fromRGB(230, 232, 240),
 	sub = Color3.fromRGB(140, 145, 168),
+	accent = Color3.fromRGB(88, 140, 255),
+	accentDark = Color3.fromRGB(58, 98, 210),
 	ok = Color3.fromRGB(80, 200, 120),
+	warn = Color3.fromRGB(235, 180, 60),
 	bad = Color3.fromRGB(235, 90, 90),
 }
 
@@ -63,21 +67,44 @@ local function create(className, properties, parent)
 	return instance
 end
 
-local root = create("ScrollingFrame", {
+local page = create("Frame", {
 	Size = UDim2.fromScale(1, 1),
-	BackgroundColor3 = COLORS.bottom,
+	BackgroundColor3 = Color3.new(0.098039, 0.101961, 0.105882),
+	BorderSizePixel = 0,
+}, widget)
+local scroller = create("ScrollingFrame", {
+	Size = UDim2.fromScale(1, 1),
+	BackgroundTransparency = 1,
 	BorderSizePixel = 0,
 	CanvasSize = UDim2.new(),
 	AutomaticCanvasSize = Enum.AutomaticSize.Y,
 	ScrollingDirection = Enum.ScrollingDirection.Y,
-	ScrollBarThickness = 5,
-	ScrollBarImageColor3 = COLORS.sub,
-}, widget)
+	ScrollBarThickness = 4,
+	ScrollBarImageColor3 = COLORS.stroke,
+}, page)
 create("UIPadding", {
-	PaddingTop = UDim.new(0, 12),
-	PaddingBottom = UDim.new(0, 12),
-	PaddingLeft = UDim.new(0, 12),
-	PaddingRight = UDim.new(0, 12),
+	PaddingTop = UDim.new(0, 10),
+	PaddingBottom = UDim.new(0, 10),
+	PaddingLeft = UDim.new(0, 10),
+	PaddingRight = UDim.new(0, 10),
+}, scroller)
+create("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder }, scroller)
+
+local root = create("Frame", {
+	Size = UDim2.new(1, 0, 0, 0),
+	AutomaticSize = Enum.AutomaticSize.Y,
+	BackgroundColor3 = Color3.new(0.086275, 0.090196, 0.105882),
+	BackgroundTransparency = 0.2,
+	BorderSizePixel = 0,
+	LayoutOrder = 1,
+}, scroller)
+create("UICorner", { CornerRadius = UDim.new(0, 10) }, root)
+create("UIStroke", { Color = COLORS.stroke, Thickness = 1, Transparency = 0.5 }, root)
+create("UIPadding", {
+	PaddingTop = UDim.new(0, 10),
+	PaddingBottom = UDim.new(0, 10),
+	PaddingLeft = UDim.new(0, 10),
+	PaddingRight = UDim.new(0, 10),
 }, root)
 create("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, root)
 
@@ -126,7 +153,7 @@ local function makeInput(labelText, initialValue, order)
 		ClearTextOnFocus = false,
 		LayoutOrder = order + 1,
 	}, root)
-	create("UICorner", { CornerRadius = UDim.new(0, 6) }, input)
+	create("UICorner", { CornerRadius = UDim.new(0, 6) }, input)\n\tcreate("UIStroke", { Color = COLORS.stroke, Thickness = 1, Transparency = 0.65 }, input)
 	return input, label
 end
 
