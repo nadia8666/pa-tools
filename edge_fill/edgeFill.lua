@@ -576,7 +576,7 @@ local function buildPreview()
 								outward,
 								loop.normal,
 								(isWedge(part) or isCornerWedge(part))
-									and part.CFrame:VectorToObjectSpace(loop.normal).X < 0,
+									and part.CFrame:VectorToObjectSpace(loop.normal).X > 0,
 								part
 							)
 								previewSources[previewParts[#previewParts]] = part.Parent
