@@ -346,7 +346,7 @@ local function getSurfaceLoops(part, worldNormal)
 			return {
 				{
 					vertices = makeRing((if localNormal.X >= 0 then 1 else -1) * part.Size.X / 2),
-					normal = axis * (if localNormal.X >= 0 then 1 else -1),
+					normal = part.CFrame.RightVector * (if localNormal.X >= 0 then 1 else -1),
 				},
 			}
 		end
