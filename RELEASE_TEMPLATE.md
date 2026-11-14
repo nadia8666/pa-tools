@@ -11,4 +11,5 @@ _`paTools.lua` is a required plugin. Download other plugins as needed:_
 | `combinePlugin.lua` | Combine arbitrary parts, meshes, and unions into optimized bulk meshes with precise collision |
 | `districtMapper.lua` | Edit the district nodemap and edit height boundaries |
 | `holeCutter.lua` | Cut holes into groups of parts and merge axis-aligned part groups together |
+| `edgeFill.lua` | Preview and apply fence segments or texture-aligned trim around surface edges |
 | `worldSelector.lua` | Bulk select instances within 3D bounds and compare spatial diffs |
