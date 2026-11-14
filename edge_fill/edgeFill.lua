@@ -36,7 +36,9 @@ local refreshPreview
 local sourcePart
 local referencePart
 local surfaceNormal
+local surfaceLocalNormal
 local surfaceLoops
+local surfaceConnections = {}
 local previewFolder
 local previewParts = {}
 local connections = {}
@@ -411,9 +413,11 @@ local function makeFence(edge, outward, normal)
 		size = Vector3.new(size.X, targetLength, size.Z)
 	end
 	clone.Size = size
-	local position = (edge.first + edge.second) / 2
+	local halfHeight = if axis == "X" then size.Y / 2 else size.X / 2
+	local position = (edge.first + edge.second) / 2 - outward * (size.Z / 2) + normal * halfHeight
 	clone.CFrame = getFenceFrame(position, edge.tangent, outward, normal, axis)
 	clone.CanQuery = false
+	clone.Archivable = false
 	clone.Parent = getPreviewFolder()
 	table.insert(previewParts, clone)
 end
@@ -431,7 +435,7 @@ local function makeTrim(edge, inward, normal)
 	if length <= 0.001 then
 		return
 	end
-	local edgeCenter = (edge.first + edge.second) / 2 - inward * (inset + width / 2)
+	local edgeCenter = (edge.first + edge.second) / 2 + inward * (inset + width / 2) + normal * (height / 2)
 	if lengthAxis == "X" then
 		size = Vector3.new(length, height, width)
 	else
@@ -456,6 +460,7 @@ local function makeTrim(edge, inward, normal)
 		removeInwardTextures(clone, inward)
 	end
 	clone.CanQuery = false
+	clone.Archivable = false
 	clone.Parent = getPreviewFolder()
 	table.insert(previewParts, clone)
 end
@@ -481,7 +486,7 @@ local function buildPreview()
 					if mode == "fence" then
 						makeFence(edge, outward, loop.normal)
 					else
-						makeTrim(edge, inward, surfaceNormal)
+						makeTrim(edge, inward, loop.normal)
 					end
 				end
 			end
@@ -506,8 +511,21 @@ local function parseNumber(input, fallback, allowNegative)
 	return value
 end
 
+	local refreshSurface = function()
+		if sourcePart and sourcePart.Parent and surfaceLocalNormal then
+			surfaceNormal = sourcePart.CFrame:VectorToWorldSpace(surfaceLocalNormal).Unit
+			surfaceLoops = getSurfaceLoops(sourcePart, surfaceNormal)
+		end
+	end
+
 refreshPreview = function()
 	if not sourcePart or not surfaceLoops then
+		return
+	end
+	refreshSurface()
+	if not surfaceLoops or #surfaceLoops == 0 then
+		clearPreview()
+		setStatus("The selected surface is no longer valid.", COLORS.bad)
 		return
 	end
 	if mode == "fence" and not referencePart then
@@ -577,9 +595,19 @@ local function selectSurface()
 		setStatus("Trim supports block and wedge surfaces only.", COLORS.bad)
 		return
 	end
+	for _, connection in surfaceConnections do
+		connection:Disconnect()
+	end
+	table.clear(surfaceConnections)
 	sourcePart = part
-	surfaceLoops = loops
-	surfaceNormal = loops[1].normal
+	surfaceLocalNormal = part.CFrame:VectorToObjectSpace(ray.Normal)
+	surfaceNormal = part.CFrame:VectorToWorldSpace(surfaceLocalNormal).Unit
+	surfaceLoops = getSurfaceLoops(part, surfaceNormal)
+	for _, property in { "Size", "CFrame" } do
+		table.insert(surfaceConnections, part:GetPropertyChangedSignal(property):Connect(function()
+			refreshPreview()
+		end))
+	end
 	if mode == "trim" then
 		height = sourcePart.Size.Y
 		heightInput.Text = tostring(height)
@@ -619,7 +647,18 @@ local function apply()
 		return
 	end
 	ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
-	Selection:Set(outputs)
+	clearPreview()
+	sourcePart = nil
+	referencePart = nil
+	surfaceNormal = nil
+	surfaceLocalNormal = nil
+	surfaceLoops = nil
+	for _, connection in surfaceConnections do
+		connection:Disconnect()
+	end
+	table.clear(surfaceConnections)
+	referenceButton.Text = "Select Fence Part"
+	Selection:Set({})
 	setStatus(string.format("Applied %d edge pieces.", #outputs), COLORS.ok)
 end
 
@@ -691,6 +730,10 @@ connect(plugin.Unloading, function()
 	toolbarCallbacks.edgeFill = nil
 	toolbar.removeButtonHandler("edgeFill")
 	clearPreview()
+	for _, connection in surfaceConnections do
+		connection:Disconnect()
+	end
+	table.clear(surfaceConnections)
 	if previewFolder then
 		previewFolder:Destroy()
 	end
