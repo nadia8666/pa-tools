@@ -438,12 +438,13 @@ local function getOutward(edge, center, normal)
 	return -inward.Unit, inward.Unit
 end
 
-local function getFenceFrame(position, tangent, outward, normal, lengthAxis)
+local function getFenceFrame(position, tangent, outward, normal, lengthAxis, mirrorLook)
+	local direction = if mirrorLook then -1 else 1
 	if lengthAxis == "Y" then
 		local up = tangent
 		local right = normal
 		local back = right:Cross(up).Unit
-		if back:Dot(outward) < 0 then
+		if back:Dot(outward) * direction < 0 then
 			up = -up
 			back = -back
 		end
@@ -452,7 +453,7 @@ local function getFenceFrame(position, tangent, outward, normal, lengthAxis)
 	local right = tangent
 	local up = normal
 	local back = right:Cross(up).Unit
-	if back:Dot(outward) < 0 then
+	if back:Dot(outward) * direction < 0 then
 		right = -right
 		back = -back
 	end
@@ -480,7 +481,7 @@ local function getLengthAxis(part)
 	return "Z"
 end
 
-local function makeFence(edge, outward, normal)
+local function makeFence(edge, outward, normal, mirrorLook)
 	local clone = clonePart(referencePart)
 	local axis = getLengthAxis(referencePart)
 	local size = clone.Size
@@ -496,8 +497,8 @@ local function makeFence(edge, outward, normal)
 	end
 	clone.Size = size
 	local halfHeight = if axis == "X" then size.Y / 2 else size.X / 2
-	local position = (edge.first + edge.second) / 2 - outward * (size.Z / 2) + normal * halfHeight
-	clone.CFrame = getFenceFrame(position, edge.tangent, outward, normal, axis)
+	local position = (edge.first + edge.second) / 2 + outward * (size.Z / 2 * (if mirrorLook then 1 else -1)) + normal * halfHeight
+	clone.CFrame = getFenceFrame(position, edge.tangent, outward, normal, axis, mirrorLook)
 	clone.CanQuery = false
 	clone.Archivable = false
 	clone.Parent = getPreviewFolder()
@@ -563,7 +564,7 @@ local function buildPreview()
 						local outward, inward = getOutward(edge, center, loop.normal)
 						if outward and inward then
 							if mode == "fence" then
-								makeFence(edge, outward, loop.normal)
+								makeFence(edge, outward, loop.normal, isWedge(part) or isCornerWedge(part))
 								previewSources[previewParts[#previewParts]] = part.Parent
 							else
 								makeTrim(edge, inward, loop.normal, part)
