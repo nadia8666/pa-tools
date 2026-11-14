@@ -564,7 +564,13 @@ local function buildPreview()
 						local outward, inward = getOutward(edge, center, loop.normal)
 						if outward and inward then
 							if mode == "fence" then
-								makeFence(edge, outward, loop.normal, isWedge(part) or isCornerWedge(part))
+								makeFence(
+								edge,
+								outward,
+								loop.normal,
+								(isWedge(part) or isCornerWedge(part))
+									and part.CFrame:VectorToObjectSpace(loop.normal).X < 0
+							)
 								previewSources[previewParts[#previewParts]] = part.Parent
 							else
 								makeTrim(edge, inward, loop.normal, part)
