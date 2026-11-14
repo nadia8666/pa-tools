@@ -142,10 +142,6 @@ local heightLabel
 local textureButton
 modeButton = makeButton("Mode: Fence", 2, function()
 	mode = if mode == "fence" then "trim" else "fence"
-	if mode == "trim" and sourcePart then
-		height = sourcePart.Size.Y
-		heightInput.Text = tostring(height)
-	end
 	modeButton.Text = "Mode: " .. (mode == "fence" and "Fence" or "Trim")
 	updateModeVisibility()
 	refreshPreview()
@@ -405,8 +401,7 @@ local function makeFence(edge, outward, normal)
 		size = Vector3.new(size.Z, size.Y, size.X)
 		axis = "X"
 	end
-	local overlap = math.max(0.02, math.min(size.X, size.Y, size.Z) * 0.025)
-	local targetLength = edge.length + overlap * 2
+	local targetLength = edge.length
 	if axis == "X" then
 		size = Vector3.new(targetLength, size.Y, size.Z)
 	else
@@ -427,10 +422,10 @@ local function makeTrim(edge, inward, normal)
 	local size
 	local localTangent = sourcePart.CFrame:VectorToObjectSpace(edge.tangent)
 	local lengthAxis = if math.abs(localTangent.X) >= math.abs(localTangent.Z) then "X" else "Z"
-	local length = edge.length
+	local length = edge.length - 2 * inset
 	local sourceTangent = sourcePart.CFrame:VectorToObjectSpace(edge.tangent)
 	if math.abs(sourceTangent.Z) > math.abs(sourceTangent.X) then
-		length -= 2 * (width + inset)
+		length -= 2 * width
 	end
 	if length <= 0.001 then
 		return
@@ -567,9 +562,54 @@ local function chooseReference()
 	setStatus("Select a BasePart in Explorer or the viewport first.", COLORS.bad)
 end
 
+local function getSurfaceNormalId(part, worldNormal)
+	local normal = part.CFrame:VectorToObjectSpace(worldNormal)
+	local x, y, z = math.abs(normal.X), math.abs(normal.Y), math.abs(normal.Z)
+	if x > y and x > z then
+		return if normal.X > 0 then Enum.NormalId.Right else Enum.NormalId.Left
+	elseif y > x and y > z then
+		return if normal.Y > 0 then Enum.NormalId.Top else Enum.NormalId.Bottom
+	end
+	return if normal.Z > 0 then Enum.NormalId.Back else Enum.NormalId.Front
+end
+
+local function updateSurfaceHighlight()
+	if not placing then
+		return
+	end
+	local ray = workspace:Raycast(mouse.UnitRay.Origin, mouse.UnitRay.Direction * 1000)
+	if ray and ray.Instance:IsA("BasePart") then
+		local part = ray.Instance
+		local supported = part:IsA("WedgePart")
+			or part:IsA("CornerWedgePart")
+			or part:IsA("Part")
+				and (part.Shape == Enum.PartType.Block or part.Shape == Enum.PartType.Cylinder)
+		if supported and (mode ~= "trim" or part:IsA("WedgePart") or part:IsA("Part") and part.Shape == Enum.PartType.Block) then
+			surfaceHighlight.Adornee = part
+			surfaceHighlight.TargetSurface = getSurfaceNormalId(part, ray.Normal)
+			return
+		end
+	end
+	surfaceHighlight.Adornee = nil
+end
+
 local function beginPlacement()
+	local folder = getPreviewFolder()
+	if not folder then
+		setStatus("The current camera is unavailable.", COLORS.bad)
+		return
+	end
+	if not surfaceHighlight then
+		surfaceHighlight = Instance.new("SurfaceSelection")
+		surfaceHighlight.Name = "SurfaceHighlight"
+		surfaceHighlight.Color3 = Color3.new(1, 0.3, 0.3)
+		surfaceHighlight.Transparency = 0.5
+		surfaceHighlight.Archivable = false
+		surfaceHighlight.Parent = folder
+	end
 	placing = true
 	plugin:Activate(true)
+	updateSurfaceHighlight()
 	setStatus("Click a surface to preview its edge pieces.")
 end
 
@@ -607,10 +647,6 @@ local function selectSurface()
 		table.insert(surfaceConnections, part:GetPropertyChangedSignal(property):Connect(function()
 			refreshPreview()
 		end))
-	end
-	if mode == "trim" then
-		height = sourcePart.Size.Y
-		heightInput.Text = tostring(height)
 	end
 	refreshPreview()
 end
@@ -683,9 +719,14 @@ for _, input in { insetInput, widthInput, heightInput } do
 	connect(input.FocusLost, refreshPreview)
 end
 
+connect(mouse.Move, updateSurfaceHighlight)
+
 connect(mouse.Button1Down, function()
 	if placing and widget.Enabled then
 		placing = false
+		if surfaceHighlight then
+			surfaceHighlight.Adornee = nil
+		end
 		selectSurface()
 	end
 end)
@@ -720,6 +761,9 @@ connect(widget:GetPropertyChangedSignal("Enabled"), function()
 	toggleButton:SetActive(widget.Enabled)
 	if not widget.Enabled then
 		placing = false
+		if surfaceHighlight then
+			surfaceHighlight.Adornee = nil
+		end
 		clearPreview()
 	else
 		plugin:Activate(true)
@@ -729,6 +773,11 @@ end)
 connect(plugin.Unloading, function()
 	toolbarCallbacks.edgeFill = nil
 	toolbar.removeButtonHandler("edgeFill")
+	placing = false
+	if surfaceHighlight then
+		surfaceHighlight.Adornee = nil
+		surfaceHighlight:Destroy()
+	end
 	clearPreview()
 	for _, connection in surfaceConnections do
 		connection:Disconnect()
