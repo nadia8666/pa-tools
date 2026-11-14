@@ -235,6 +235,18 @@ local function faceNormal(vertices, shapeCenter)
 	return normal
 end
 
+local function isWedge(part)
+	return part:IsA("WedgePart") or part:IsA("Part") and part.Shape == Enum.PartType.Wedge
+end
+
+local function isCornerWedge(part)
+	return part:IsA("CornerWedgePart") or part:IsA("Part") and part.Shape == Enum.PartType.CornerWedge
+end
+
+local function isCylinder(part)
+	return part:IsA("Part") and part.Shape == Enum.PartType.Cylinder
+end
+
 local function makeFaces(part)
 	local half = part.Size / 2
 	local x, y, z = half.X, half.Y, half.Z
@@ -242,13 +254,13 @@ local function makeFaces(part)
 	local function add(vertices)
 		table.insert(faces, vertices)
 	end
-	if part:IsA("WedgePart") then
+	if isWedge(part) then
 		add({ Vector3.new(-x, -y, -z), Vector3.new(x, -y, -z), Vector3.new(x, -y, z), Vector3.new(-x, -y, z) })
 		add({ Vector3.new(-x, -y, z), Vector3.new(-x, y, -z), Vector3.new(x, y, -z), Vector3.new(x, -y, z) })
 		add({ Vector3.new(-x, -y, -z), Vector3.new(x, -y, -z), Vector3.new(x, y, -z), Vector3.new(-x, y, -z) })
 		add({ Vector3.new(-x, -y, -z), Vector3.new(-x, -y, z), Vector3.new(-x, y, -z) })
 		add({ Vector3.new(x, -y, -z), Vector3.new(x, y, -z), Vector3.new(x, -y, z) })
-	elseif part:IsA("CornerWedgePart") then
+	elseif isCornerWedge(part) then
 		add({ Vector3.new(-x, -y, -z), Vector3.new(x, -y, -z), Vector3.new(x, -y, z), Vector3.new(-x, -y, z) })
 		add({ Vector3.new(-x, -y, -z), Vector3.new(-x, -y, z), Vector3.new(-x, y, -z) })
 		add({ Vector3.new(-x, -y, -z), Vector3.new(-x, y, -z), Vector3.new(x, -y, -z) })
@@ -266,27 +278,59 @@ local function makeFaces(part)
 end
 
 local function getSurfacePolygon(part, worldNormal)
-	if part:IsA("Part") and part.Shape == Enum.PartType.Cylinder then
+	if isCylinder(part) then
 		local localNormal = part.CFrame:VectorToObjectSpace(worldNormal)
 		if math.abs(localNormal.X) < 0.85 then
 			return nil
 		end
 		local vertices = {}
 		local sign = if localNormal.X >= 0 then 1 else -1
-		for index = 0, 19 do
-			local angle = index / 20 * math.pi * 2
-			table.insert(
-				vertices,
-				part.CFrame:PointToWorldSpace(
-					Vector3.new(
-						sign * part.Size.X / 2,
-						math.cos(angle) * part.Size.Y / 2,
-						math.sin(angle) * part.Size.Z / 2
-					)
-				)
-			)
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Include
+		params.FilterDescendantsInstances = { part }
+		local radius = math.max(part.Size.Y, part.Size.Z) / 2
+		local planes = {}
+		for index = 0, 191 do
+			local angle = index / 192 * math.pi * 2
+			local radial = Vector3.new(0, math.cos(angle), math.sin(angle))
+			local origin = part.CFrame:PointToWorldSpace(radial * radius * 2)
+			local direction = part.CFrame:VectorToWorldSpace(-radial * radius * 4)
+			local hit = workspace:Raycast(origin, direction, params)
+			if hit then
+				local normal = part.CFrame:VectorToObjectSpace(hit.Normal)
+				local duplicate = false
+				for _, plane in planes do
+					if plane.normal:Dot(normal) > 0.9999 then
+						duplicate = true
+						break
+					end
+				end
+				if not duplicate then
+					local point = part.CFrame:PointToObjectSpace(hit.Position)
+					table.insert(planes, { normal = Vector3.new(0, normal.Y, normal.Z).Unit, distance = normal.Y * point.Y + normal.Z * point.Z })
+				end
+			end
 		end
-		return vertices
+		table.sort(planes, function(first, second)
+			return math.atan2(first.normal.Z, first.normal.Y) < math.atan2(second.normal.Z, second.normal.Y)
+		end)
+		if #planes < 3 then
+			for index = 0, 23 do
+				local angle = index / 24 * math.pi * 2
+				table.insert(vertices, part.CFrame:PointToWorldSpace(Vector3.new(sign * part.Size.X / 2, math.cos(angle) * part.Size.Y / 2, math.sin(angle) * part.Size.Z / 2)))
+			end
+			return vertices
+		end
+		for index, first in planes do
+			local second = planes[index % #planes + 1]
+			local determinant = first.normal.Y * second.normal.Z - first.normal.Z * second.normal.Y
+			if math.abs(determinant) > 0.0001 then
+				local y = (first.distance * second.normal.Z - first.normal.Z * second.distance) / determinant
+				local z = (first.normal.Y * second.distance - first.distance * second.normal.Y) / determinant
+				table.insert(vertices, part.CFrame:PointToWorldSpace(Vector3.new(sign * part.Size.X / 2, y, z)))
+			end
+		end
+		return if #vertices >= 3 then vertices else nil
 	end
 	local localNormal = part.CFrame:VectorToObjectSpace(worldNormal)
 	local faces = makeFaces(part)
@@ -327,18 +371,12 @@ local function getSurfacePolygon(part, worldNormal)
 end
 
 local function getSurfaceLoops(part, worldNormal)
-	if part:IsA("Part") and part.Shape == Enum.PartType.Cylinder then
+	if isCylinder(part) then
 		local localNormal = part.CFrame:VectorToObjectSpace(worldNormal)
 		local function makeRing(x)
-			local vertices = {}
-			for index = 0, 19 do
-				local angle = index / 20 * math.pi * 2
-				table.insert(
-					vertices,
-					part.CFrame:PointToWorldSpace(
-						Vector3.new(x, math.cos(angle) * part.Size.Y / 2, math.sin(angle) * part.Size.Z / 2)
-					)
-				)
+			local vertices = getSurfacePolygon(part, part.CFrame.RightVector * (if x >= 0 then 1 else -1))
+			if not vertices then
+				return {}
 			end
 			return vertices
 		end
@@ -468,7 +506,7 @@ local function makeTrim(edge, inward, normal, part)
 	clone.Size = size
 	local baseFrame = part.CFrame
 	local surfaceAlignment = CFrame.identity
-	if part:IsA("WedgePart") then
+	if isWedge(part) or isCornerWedge(part) then
 		local targetUp = normal
 		local targetRight = edge.tangent
 		local targetBack = targetRight:Cross(targetUp).Unit
@@ -615,12 +653,11 @@ local function updateSurfaceHighlight()
 	local ray = workspace:Raycast(mouse.UnitRay.Origin, mouse.UnitRay.Direction * 1000)
 	if ray and ray.Instance:IsA("BasePart") then
 		local part = ray.Instance
-		local supported = part:IsA("WedgePart")
-			or part:IsA("CornerWedgePart")
-			or part:IsA("Part")
-				and (part.Shape == Enum.PartType.Block or part.Shape == Enum.PartType.Cylinder)
+		local supported = isWedge(part)
+			or isCornerWedge(part)
+			or part:IsA("Part") and (part.Shape == Enum.PartType.Block or isCylinder(part))
 		local loops = if supported then getSurfaceLoops(part, ray.Normal) else nil
-		if loops and #loops > 0 and (mode ~= "trim" or part:IsA("WedgePart") or part:IsA("Part") and part.Shape == Enum.PartType.Block) then
+		if loops and #loops > 0 and (mode ~= "trim" or isWedge(part) or isCornerWedge(part) or part:IsA("Part") and part.Shape == Enum.PartType.Block) then
 			surfaceHighlight.Adornee = part
 			surfaceHighlight.TargetSurface = getSurfaceNormalId(part, ray.Normal)
 			return
@@ -654,7 +691,7 @@ local function beginPlacement()
 	placing = true
 	plugin:Activate(true)
 	updateSurfaceHighlight()
-	setStatus("Click a surface to preview its edge pieces.")
+	setStatus("Click a surface. Hold Shift while clicking to select multiple surfaces.")
 end
 
 local function selectSurface()
@@ -663,22 +700,22 @@ local function selectSurface()
 		return false
 	end
 	local part = ray.Instance
-	local supported = part:IsA("WedgePart")
-		or part:IsA("CornerWedgePart")
-		or part:IsA("Part") and (part.Shape == Enum.PartType.Block or part.Shape == Enum.PartType.Cylinder)
+	local supported = isWedge(part)
+		or isCornerWedge(part)
+		or part:IsA("Part") and (part.Shape == Enum.PartType.Block or isCylinder(part))
 	if not supported then
-		setStatus("Fence supports block, wedge, corner wedge, and cylinder end-cap surfaces.", COLORS.bad)
+		setStatus("Supported surfaces: block, wedge, corner wedge, and cylinder end caps.", COLORS.bad)
 		return false
 	end
-	if mode == "trim" and not (part:IsA("WedgePart") or part:IsA("Part") and part.Shape == Enum.PartType.Block) then
-		setStatus("Trim supports block and wedge surfaces only.", COLORS.bad)
+	if mode == "trim" and not (part:IsA("Part") and part.Shape == Enum.PartType.Block or isWedge(part) or isCornerWedge(part)) then
+		setStatus("Trim supports block, wedge, and corner wedge surfaces only.", COLORS.bad)
 		return false
 	end
 	local localNormal = part.CFrame:VectorToObjectSpace(ray.Normal)
 	local normal = part.CFrame:VectorToWorldSpace(localNormal).Unit
 	local loops = getSurfaceLoops(part, normal)
 	if not loops or #loops == 0 or #loops[1].vertices < 3 then
-		setStatus("This face is not supported. Cylinder side faces cannot be selected.", COLORS.bad)
+		setStatus("This face is not supported. Only cylinder end caps can be selected.", COLORS.bad)
 		return false
 	end
 	for _, surface in selectedSurfaces do
