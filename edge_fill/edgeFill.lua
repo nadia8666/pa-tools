@@ -354,18 +354,21 @@ local function getSurfacePolygon(part, worldNormal)
 	local selectedDot = -math.huge
 	for _, vertices in faces do
 		local normal = faceNormal(vertices, shapeCenter)
-		local dot = normal:Dot(localNormal)
+		local dot = math.abs(normal:Dot(localNormal))
 		if dot > selectedDot then
 			selectedDot = dot
 			selected = vertices
 		end
 	end
-	if not selected or selectedDot < 0.9 then
+	if not selected or selectedDot < 0.75 then
 		return nil
 	end
-	local result = {}
-	for _, vertex in selected do
-		table.insert(result, part.CFrame:PointToWorldSpace(vertex))
+	local result = table.clone(selected)
+	if faceNormal(result, shapeCenter):Dot(localNormal) < 0 then
+		table.reverse(result)
+	end
+	for index, vertex in result do
+		result[index] = part.CFrame:PointToWorldSpace(vertex)
 	end
 	return result
 end
@@ -434,9 +437,23 @@ end
 
 local function getFenceFrame(position, tangent, outward, normal, lengthAxis)
 	if lengthAxis == "Y" then
-		return CFrame.fromMatrix(position, tangent:Cross(-outward).Unit, tangent, -outward)
+		local up = tangent
+		local right = normal
+		local back = right:Cross(up).Unit
+		if back:Dot(outward) < 0 then
+			up = -up
+			back = -back
+		end
+		return CFrame.fromMatrix(position, right, up, back)
 	end
-	return CFrame.fromMatrix(position, normal:Cross(-outward).Unit, normal, -outward)
+	local right = tangent
+	local up = normal
+	local back = right:Cross(up).Unit
+	if back:Dot(outward) < 0 then
+		right = -right
+		back = -back
+	end
+	return CFrame.fromMatrix(position, right, up, back)
 end
 
 local function removeInwardTextures(clone, inward)
