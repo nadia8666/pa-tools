@@ -1551,10 +1551,10 @@ makeButton("Subdivide selected edge", 5, function()
 							height = extrusion:GetAttribute("DistrictMapperTotalHeight")
 							break
 						end
+					end
+				end
 				if height ~= nil then
 					setSectionExtrusionHeight(group, sectionId, height)
-				end
-					end
 				end
 				table.insert(inheritedFaces, {
 					sectionId = sectionId,
@@ -1618,11 +1618,6 @@ makeButton("Subdivide selected edge", 5, function()
 					offsets[newSectionId] = face.lightnessOffset
 				end
 				offsets[face.sectionId] = nil
-				for _, fillPart in group.preview:GetDescendants() do
-					if fillPart:GetAttribute("DistrictMapperFill") == newSectionId then
-						fillPart:SetAttribute("DistrictMapperExtrusionHeight", face.height)
-					end
-				end
 				if face.height ~= nil then
 					for _, fillPart in group.preview:GetDescendants() do
 						if fillPart:GetAttribute("DistrictMapperFill") == newSectionId then
