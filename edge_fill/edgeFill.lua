@@ -513,7 +513,29 @@ local function makeFence(edge, outward, normal, mirrorSide, part)
 end
 
 local function makeTrim(edge, inward, normal, part)
-	local clone = clonePart(part)
+	local source = clonePart(part)
+	local clone = Instance.new("Part")
+	for _, property in {
+		"Anchored",
+		"CanCollide",
+		"CanTouch",
+		"CanQuery",
+		"CastShadow",
+		"Color",
+		"CollisionGroup",
+		"CustomPhysicalProperties",
+		"Material",
+		"MaterialVariant",
+		"Massless",
+		"Reflectance",
+		"Transparency",
+	} do
+		clone[property] = source[property]
+	end
+	for _, child in source:GetChildren() do
+		child.Parent = clone
+	end
+	source:Destroy()
 	local size
 	local localTangent = part.CFrame:VectorToObjectSpace(edge.tangent)
 	local lengthAxis = if math.abs(localTangent.X) >= math.abs(localTangent.Z) then "X" else "Z"
@@ -526,6 +548,9 @@ local function makeTrim(edge, inward, normal, part)
 		return
 	end
 	local edgeCenter = (edge.first + edge.second) / 2 + inward * (inset + width / 2) + normal * (height / 2)
+	if (isWedge(part) or isCornerWedge(part)) and part.CFrame:VectorToObjectSpace(normal).X > 0 then
+		edgeCenter += part.CFrame.RightVector * part.Size.X
+	end
 	if lengthAxis == "X" then
 		size = Vector3.new(length, height, width)
 	else
