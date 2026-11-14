@@ -721,6 +721,27 @@ local function setSectionDistrict(group, sectionId, districtName)
 	group.preview:SetAttribute("DistrictMapperAssignments", HttpService:JSONEncode(assignments))
 end
 
+local function getSectionExtrusionHeights(group)
+	local encoded = group.preview:GetAttribute("DistrictMapperExtrusionHeights")
+	if not encoded then
+		return {}
+	end
+	local ok, heights = pcall(function()
+		return HttpService:JSONDecode(encoded)
+	end)
+	return if ok and type(heights) == "table" then heights else {}
+end
+
+local function setSectionExtrusionHeight(group, sectionId, height)
+	local heights = getSectionExtrusionHeights(group)
+	if height == nil then
+		heights[sectionId] = nil
+	else
+		heights[sectionId] = height
+	end
+	group.preview:SetAttribute("DistrictMapperExtrusionHeights", HttpService:JSONEncode(heights))
+end
+
 local function getDistrictColor(districtName)
 	local districtFolder = ReplicatedStorage:FindFirstChild("Districts")
 	local districtData = districtFolder and districtName and districtFolder:FindFirstChild(districtName)
@@ -774,7 +795,7 @@ updatePolygon = function(group, forceRebuild)
 		local fillSignature = table.concat(signatureParts, "|")
 		local existingParts = {}
 		local existingSignature
-		local extrusionHeight
+		local extrusionHeight = getSectionExtrusionHeights(group)[sectionId]
 		for _, instance in group.preview:GetDescendants() do
 			if instance:GetAttribute("DistrictMapperFill") == sectionId then
 				table.insert(existingParts, instance)
@@ -793,6 +814,9 @@ updatePolygon = function(group, forceRebuild)
 					break
 				end
 			end
+		end
+		if extrusionHeight ~= nil then
+			setSectionExtrusionHeight(group, sectionId, extrusionHeight)
 		end
 		if not forceRebuild and existingSignature == fillSignature and #existingParts > 0 then
 			continue
@@ -1270,6 +1294,7 @@ local function extrudeGroup(group, height, targetSectionId)
 	for index, editableMesh in meshes do
 		runtimeExtrusions[created[index]] = editableMesh
 	end
+	setSectionExtrusionHeight(group, sectionId, height)
 	for _, fillPart in group.preview:GetDescendants() do
 		if fillPart:GetAttribute("DistrictMapperFill") == sectionId then
 			fillPart:SetAttribute("DistrictMapperExtrusionHeight", height)
@@ -1279,14 +1304,31 @@ local function extrudeGroup(group, height, targetSectionId)
 end
 
 reextrudeSection = function(group, sectionId)
-	local totalHeight
-	for _, fillPart in group.preview:GetDescendants() do
-		if fillPart:GetAttribute("DistrictMapperFill") == sectionId then
-			totalHeight = fillPart:GetAttribute("DistrictMapperExtrusionHeight")
-			if totalHeight ~= nil then
+	local totalHeight = getSectionExtrusionHeights(group)[sectionId]
+	if totalHeight == nil then
+		for _, fillPart in group.preview:GetDescendants() do
+			if fillPart:GetAttribute("DistrictMapperFill") == sectionId then
+				totalHeight = fillPart:GetAttribute("DistrictMapperExtrusionHeight")
+				if totalHeight ~= nil then
+					break
+				end
+			end
+		end
+	end
+	if totalHeight == nil then
+		for _, extrusion in outputFolder:GetChildren() do
+			if
+				extrusion:GetAttribute("DistrictMapperExtrusion")
+				and extrusion:GetAttribute("DistrictMapperGroup") == group.id
+				and extrusion:GetAttribute("DistrictMapperSection") == sectionId
+			then
+				totalHeight = extrusion:GetAttribute("DistrictMapperTotalHeight")
 				break
 			end
 		end
+	end
+	if totalHeight ~= nil then
+		setSectionExtrusionHeight(group, sectionId, totalHeight)
 	end
 	if totalHeight and totalHeight ~= 0 then
 		extrudeGroup(group, totalHeight, sectionId)
@@ -1490,10 +1532,10 @@ makeButton("Subdivide selected edge", 5, function()
 			end
 			if containsEdge then
 				local sectionId = getSectionId(boundary)
-				local height
+				local height = getSectionExtrusionHeights(group)[sectionId]
 				for _, fillPart in group.preview:GetDescendants() do
 					if fillPart:GetAttribute("DistrictMapperFill") == sectionId then
-						height = fillPart:GetAttribute("DistrictMapperExtrusionHeight")
+						height = height or fillPart:GetAttribute("DistrictMapperExtrusionHeight")
 						if height ~= nil then
 							break
 						end
@@ -1509,6 +1551,9 @@ makeButton("Subdivide selected edge", 5, function()
 							height = extrusion:GetAttribute("DistrictMapperTotalHeight")
 							break
 						end
+				if height ~= nil then
+					setSectionExtrusionHeight(group, sectionId, height)
+				end
 					end
 				end
 				table.insert(inheritedFaces, {
@@ -1565,6 +1610,10 @@ makeButton("Subdivide selected edge", 5, function()
 				local newSectionId = getSectionId(matchingBoundary)
 				assignments[newSectionId] = face.districtName
 				assignments[face.sectionId] = nil
+				if face.height ~= nil then
+					setSectionExtrusionHeight(group, newSectionId, face.height)
+				end
+				setSectionExtrusionHeight(group, face.sectionId, nil)
 				if face.lightnessOffset ~= nil then
 					offsets[newSectionId] = face.lightnessOffset
 				end
