@@ -290,8 +290,8 @@ local function getSurfacePolygon(part, worldNormal)
 		params.FilterDescendantsInstances = { part }
 		local radius = math.max(part.Size.Y, part.Size.Z) / 2
 		local planes = {}
-		for index = 0, 191 do
-			local angle = index / 192 * math.pi * 2
+		for index = 0, 719 do
+			local angle = index / 720 * math.pi * 2
 			local radial = Vector3.new(0, math.cos(angle), math.sin(angle))
 			local origin = part.CFrame:PointToWorldSpace(radial * radius * 2)
 			local direction = part.CFrame:VectorToWorldSpace(-radial * radius * 4)
@@ -300,27 +300,27 @@ local function getSurfacePolygon(part, worldNormal)
 				local normal = part.CFrame:VectorToObjectSpace(hit.Normal)
 				local duplicate = false
 				for _, plane in planes do
-					if plane.normal:Dot(normal) > 0.9999 then
+					if plane.normal:Dot(normal) > 0.98 then
 						duplicate = true
 						break
 					end
 				end
 				if not duplicate then
 					local point = part.CFrame:PointToObjectSpace(hit.Position)
-					table.insert(planes, { normal = Vector3.new(0, normal.Y, normal.Z).Unit, distance = normal.Y * point.Y + normal.Z * point.Z })
+					local sideNormal = Vector3.new(0, normal.Y, normal.Z).Unit
+					table.insert(planes, {
+						normal = sideNormal,
+						distance = sideNormal.Y * point.Y + sideNormal.Z * point.Z,
+					})
 				end
 			end
 		end
-		table.sort(planes, function(first, second)
-			return math.atan2(first.normal.Z, first.normal.Y) < math.atan2(second.normal.Z, second.normal.Y)
-		end)
-		if #planes < 3 then
-			for index = 0, 23 do
-				local angle = index / 24 * math.pi * 2
-				table.insert(vertices, part.CFrame:PointToWorldSpace(Vector3.new(sign * part.Size.X / 2, math.cos(angle) * part.Size.Y / 2, math.sin(angle) * part.Size.Z / 2)))
-			end
-			return vertices
+		if #planes ~= 24 then
+			return nil
 		end
+		table.sort(planes, function(first, second)
+			return math.atan(first.normal.Z, first.normal.Y) < math.atan(second.normal.Z, second.normal.Y)
+		end)
 		for index, first in planes do
 			local second = planes[index % #planes + 1]
 			local determinant = first.normal.Y * second.normal.Z - first.normal.Z * second.normal.Y
