@@ -2373,7 +2373,7 @@ local function extractMeshPart(meshPart, identity, assemblyId)
 	if not editableMesh then
 		return nil
 	end
-	local ok, result = pcall(function()
+	local extractOk, result = pcall(function()
 		editableMesh:Triangulate()
 		local positions = {}
 		local normals = {}
@@ -2435,7 +2435,7 @@ local function extractMeshPart(meshPart, identity, assemblyId)
 		}
 	end)
 	editableMesh:Destroy()
-	if not ok then
+	if not extractOk then
 		return nil
 	end
 	return result
