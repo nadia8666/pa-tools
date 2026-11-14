@@ -130,6 +130,14 @@ end
 
 local statusLabel = makeLabel("Fence: choose a reference part. Trim: click a building surface.", 38, 1)
 local modeButton
+local referenceButton
+local insetInput
+local widthInput
+local heightInput
+local insetLabel
+local widthLabel
+local heightLabel
+local textureButton
 modeButton = makeButton("Mode: Fence", 2, function()
 	mode = if mode == "fence" then "trim" else "fence"
 	if mode == "trim" and sourcePart then
@@ -140,14 +148,6 @@ modeButton = makeButton("Mode: Fence", 2, function()
 	updateModeVisibility()
 	refreshPreview()
 end)
-local referenceButton
-local insetInput
-local widthInput
-local heightInput
-local insetLabel
-local widthLabel
-local heightLabel
-local textureButton
 
 local function setStatus(message, color)
 	statusLabel.Text = message
@@ -420,6 +420,7 @@ end
 
 local function makeTrim(edge, inward, normal)
 	local clone = clonePart(sourcePart)
+	local size
 	local localTangent = sourcePart.CFrame:VectorToObjectSpace(edge.tangent)
 	local lengthAxis = if math.abs(localTangent.X) >= math.abs(localTangent.Z) then "X" else "Z"
 	local length = edge.length
