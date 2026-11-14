@@ -319,7 +319,7 @@ local function getSurfacePolygon(part, worldNormal)
 			return nil
 		end
 		table.sort(planes, function(first, second)
-			return math.atan(first.normal.Z, first.normal.Y) < math.atan(second.normal.Z, second.normal.Y)
+			return math.atan2(first.normal.Z, first.normal.Y) < math.atan(second.normal.Z, second.normal.Y)
 		end)
 		for index, first in planes do
 			local second = planes[index % #planes + 1]
@@ -365,7 +365,10 @@ local function getSurfacePolygon(part, worldNormal)
 	end
 	local result = table.clone(selected)
 	if faceNormal(result, shapeCenter):Dot(localNormal) < 0 then
-		table.reverse(result)
+		for index = 1, math.floor(#result / 2) do
+			local opposite = #result - index + 1
+			result[index], result[opposite] = result[opposite], result[index]
+		end
 	end
 	for index, vertex in result do
 		result[index] = part.CFrame:PointToWorldSpace(vertex)
