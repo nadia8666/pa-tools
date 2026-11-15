@@ -503,8 +503,7 @@ local function makeFence(edge, outward, normal)
 	local halfHeight = if axis == "X" then size.Y / 2 else size.X / 2
 	local midpoint = (edge.first + edge.second) / 2
 	local frame = getFenceFrame(midpoint, edge.tangent, outward, normal, axis)
-	local heightAxis = if axis == "X" then frame.UpVector else frame.RightVector
-	local position = midpoint + frame.LookVector * (size.Z / 2) + heightAxis * halfHeight
+	local position = midpoint + normal * halfHeight + frame.LookVector * (size.Z / 2)
 	clone.CFrame = frame + (position - midpoint)
 	clone.CanQuery = false
 	clone.Archivable = false
