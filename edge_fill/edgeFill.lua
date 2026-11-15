@@ -305,7 +305,7 @@ local function getSurfacePolygon(part, worldNormal)
 				local normal = part.CFrame:VectorToObjectSpace(hit.Normal)
 				local duplicate = false
 				for _, plane in planes do
-					if plane.normal:Dot(normal) > 0.98 then
+					if plane.normal:Dot(Vector3.new(0, normal.Y, normal.Z).Unit) > 0.999 then
 						duplicate = true
 						break
 					end
@@ -324,7 +324,7 @@ local function getSurfacePolygon(part, worldNormal)
 			return nil
 		end
 		table.sort(planes, function(first, second)
-			return math.atan2(first.normal.Z, first.normal.Y) < math.atan(second.normal.Z, second.normal.Y)
+			return math.atan2(first.normal.Z, first.normal.Y) < math.atan2(second.normal.Z, second.normal.Y)
 		end)
 		for index, first in planes do
 			local second = planes[index % #planes + 1]
@@ -540,16 +540,14 @@ local function makeTrim(edge, inward, normal, part)
 	local localTangent = part.CFrame:VectorToObjectSpace(edge.tangent)
 	local lengthAxis = if math.abs(localTangent.X) >= math.abs(localTangent.Z) then "X" else "Z"
 	local length = edge.length - 2 * inset
-	local sourceTangent = part.CFrame:VectorToObjectSpace(edge.tangent)
-	if math.abs(sourceTangent.Z) > math.abs(sourceTangent.X) then
-		length -= 2 * width
-	end
 	if length <= 0.001 then
 		return
 	end
 	local edgeCenter = (edge.first + edge.second) / 2 + inward * (inset + width / 2) + normal * (height / 2)
-	if (isWedge(part) or isCornerWedge(part)) and part.CFrame:VectorToObjectSpace(normal).X > 0 then
-		edgeCenter += part.CFrame.RightVector * part.Size.X
+	if isWedge(part) or isCornerWedge(part) then
+		if part.CFrame:VectorToObjectSpace(normal).X > 0 then
+			edgeCenter += part.CFrame.RightVector * part.Size.X
+		end
 	end
 	if lengthAxis == "X" then
 		size = Vector3.new(length, height, width)
@@ -557,20 +555,13 @@ local function makeTrim(edge, inward, normal, part)
 		size = Vector3.new(width, height, length)
 	end
 	clone.Size = size
-	local baseFrame = part.CFrame
-	local surfaceAlignment = CFrame.identity
-	if isWedge(part) or isCornerWedge(part) then
-		local targetUp = normal
-		local targetRight = edge.tangent
-		local targetBack = targetRight:Cross(targetUp).Unit
-		if lengthAxis == "X" then
-			surfaceAlignment = CFrame.fromMatrix(Vector3.zero, targetRight, targetUp, targetBack)
-		else
-			surfaceAlignment = CFrame.fromMatrix(Vector3.zero, targetBack, targetUp, -targetRight)
-		end
-		baseFrame = CFrame.new(part.Position) * surfaceAlignment.Rotation
+	local targetRight = edge.tangent
+	local targetBack = targetRight:Cross(normal).Unit
+	if targetBack:Dot(inward) < 0 then
+		targetRight = -targetRight
+		targetBack = -targetBack
 	end
-	clone.CFrame = CFrame.new(edgeCenter) * baseFrame.Rotation
+	clone.CFrame = CFrame.fromMatrix(edgeCenter, targetRight, normal, targetBack)
 	if deletingInwardTextures then
 		removeInwardTextures(clone, inward)
 	end
