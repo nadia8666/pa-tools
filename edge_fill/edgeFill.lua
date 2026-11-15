@@ -504,7 +504,7 @@ local function makeFence(edge, outward, normal, mirrorSide, part)
 	local midpoint = (edge.first + edge.second) / 2
 	local frame = getFenceFrame(midpoint, edge.tangent, outward, normal, axis)
 	local heightAxis = if axis == "X" then frame.UpVector else frame.RightVector
-	local position = midpoint - frame.LookVector * (size.Z / 2) + heightAxis * halfHeight
+	local position = midpoint + frame.LookVector * (size.Z / 2) + heightAxis * halfHeight
 	if mirrorSide then
 		position += part.CFrame.RightVector * part.Size.X
 	end
