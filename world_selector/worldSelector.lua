@@ -165,7 +165,7 @@ local function getNearbyParts(boxes, revision)
 			if revision ~= refreshRevision then
 				return nil
 			end
-			updateProgress(string.format("Filtering nearby instances: %d / %d", index, #queried))
+			updateProgress(string.format("Filtering Workspace BaseParts: %d / %d", index, #queried))
 			task.wait()
 		end
 	end
