@@ -211,6 +211,8 @@ pub fn build(input: &PrimitiveInput) -> Result<PrimitiveMesh, String> {
     for position in &mut mesh.positions {
         if input.shape == "wedge" {
             position[2] = -position[2];
+        } else if input.shape == "cylinder" {
+            *position = [-position[1], position[0], position[2]];
         }
         for axis in 0..3 {
             position[axis] *= input.size[axis];
@@ -239,8 +241,8 @@ pub fn build(input: &PrimitiveInput) -> Result<PrimitiveMesh, String> {
                 ])
             } else if cylinder_side {
                 normalize([
-                    position[0] / (input.size[0] * input.size[0]),
                     0.0,
+                    position[1] / (input.size[1] * input.size[1]),
                     position[2] / (input.size[2] * input.size[2]),
                 ])
             } else {
@@ -294,6 +296,25 @@ mod tests {
 
         let sphere_mesh = build(&input("ball")).unwrap();
         assert_eq!(sphere_mesh.indices.len(), 32 * (2 + 14 * 2) * 3);
+    }
+
+    #[test]
+    fn cylinder_local_x_axis_follows_roblox_cylinder_orientation() {
+        let mut cylinder_input = input("cylinder");
+        cylinder_input.size = [4.0, 2.0, 2.0];
+        cylinder_input.transform = [0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0];
+        let mesh = build(&cylinder_input).unwrap();
+        let mut minimum = [f32::INFINITY; 3];
+        let mut maximum = [f32::NEG_INFINITY; 3];
+        for position in mesh.positions {
+            for axis in 0..3 {
+                minimum[axis] = minimum[axis].min(position[axis]);
+                maximum[axis] = maximum[axis].max(position[axis]);
+            }
+        }
+        assert!((maximum[0] - minimum[0] - 2.0).abs() < 1e-5);
+        assert!((maximum[1] - minimum[1] - 4.0).abs() < 1e-5);
+        assert!((maximum[2] - minimum[2] - 2.0).abs() < 1e-5);
     }
 
     #[test]
