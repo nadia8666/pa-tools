@@ -288,13 +288,12 @@ local function getSurfacePolygon(part, worldNormal)
 		if math.abs(localNormal.X) < 0.85 then
 			return nil
 		end
-		local vertices = {}
 		local sign = if localNormal.X >= 0 then 1 else -1
 		local params = RaycastParams.new()
 		params.FilterType = Enum.RaycastFilterType.Include
 		params.FilterDescendantsInstances = { part }
 		local radius = math.max(part.Size.Y, part.Size.Z) / 2
-		local planes = {}
+		local points = {}
 		for index = 0, 719 do
 			local angle = index / 720 * math.pi * 2
 			local radial = Vector3.new(0, math.cos(angle), math.sin(angle))
@@ -302,38 +301,39 @@ local function getSurfacePolygon(part, worldNormal)
 			local direction = part.CFrame:VectorToWorldSpace(-radial * radius * 4)
 			local hit = workspace:Raycast(origin, direction, params)
 			if hit then
-				local normal = part.CFrame:VectorToObjectSpace(hit.Normal)
-				local duplicate = false
-				for _, plane in planes do
-					if plane.normal:Dot(Vector3.new(0, normal.Y, normal.Z).Unit) > 0.999 then
-						duplicate = true
-						break
-					end
-				end
-				if not duplicate then
-					local point = part.CFrame:PointToObjectSpace(hit.Position)
-					local sideNormal = Vector3.new(0, normal.Y, normal.Z).Unit
-					table.insert(planes, {
-						normal = sideNormal,
-						distance = sideNormal.Y * point.Y + sideNormal.Z * point.Z,
-					})
-				end
+				local point = part.CFrame:PointToObjectSpace(hit.Position)
+				table.insert(points, Vector2.new(point.Y, point.Z))
 			end
 		end
-		if #planes ~= 24 then
-			return nil
-		end
-		table.sort(planes, function(first, second)
-			return math.atan2(first.normal.Z, first.normal.Y) < math.atan2(second.normal.Z, second.normal.Y)
+		table.sort(points, function(first, second)
+			return first.X == second.X and first.Y < second.Y or first.X < second.X
 		end)
-		for index, first in planes do
-			local second = planes[index % #planes + 1]
-			local determinant = first.normal.Y * second.normal.Z - first.normal.Z * second.normal.Y
-			if math.abs(determinant) > 0.0001 then
-				local y = (first.distance * second.normal.Z - first.normal.Z * second.distance) / determinant
-				local z = (first.normal.Y * second.distance - first.distance * second.normal.Y) / determinant
-				table.insert(vertices, part.CFrame:PointToWorldSpace(Vector3.new(sign * part.Size.X / 2, y, z)))
+		local function cross(origin, first, second)
+			return (first.X - origin.X) * (second.Y - origin.Y) - (first.Y - origin.Y) * (second.X - origin.X)
+		end
+		local hull = {}
+		for _, point in points do
+			if #hull == 0 or (point - hull[#hull]).Magnitude > 0.001 then
+				while #hull >= 2 and cross(hull[#hull - 1], hull[#hull], point) <= 0.000001 do
+					table.remove(hull)
+				end
+				table.insert(hull, point)
 			end
+		end
+		local lowerCount = #hull
+		for index = #points - 1, 1, -1 do
+			local point = points[index]
+			while #hull > lowerCount and cross(hull[#hull - 1], hull[#hull], point) <= 0.000001 do
+				table.remove(hull)
+			end
+			table.insert(hull, point)
+		end
+		if #hull > 1 then
+			table.remove(hull)
+		end
+		local vertices = {}
+		for _, point in hull do
+			table.insert(vertices, part.CFrame:PointToWorldSpace(Vector3.new(sign * part.Size.X / 2, point.X, point.Y)))
 		end
 		return if #vertices >= 3 then vertices else nil
 	end
@@ -750,7 +750,7 @@ local function selectSurface()
 		or isCornerWedge(part)
 		or part:IsA("Part") and (part.Shape == Enum.PartType.Block or isCylinder(part))
 	if not supported then
-		setStatus("Supported surfaces: block, wedge, corner wedge, and cylinder end caps.", COLORS.bad)
+		setStatus("Supported surfaces: block, wedge, corner wedge, and cylinder faces.", COLORS.bad)
 		return false
 	end
 	if mode == "trim" and not (part:IsA("Part") and part.Shape == Enum.PartType.Block or isWedge(part) or isCornerWedge(part)) then
