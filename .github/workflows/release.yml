@@ -82,21 +82,27 @@ jobs:
       - name: stage plugin source files
         shell: pwsh
         run: |
-          $sourceFiles = @{
-            "paTools.lua" = "pa_tools/paTools.lua"
-            "PASync.lua" = "sync_plugin/PASync.lua"
-            "combinePlugin.lua" = "combine/combinePlugin.lua"
-            "districtMapper.lua" = "district_mapper/districtMapper.lua"
-            "holeCutter.lua" = "hole_cutter/holeCutter.lua"
-            "worldSelector.lua" = "world_selector/worldSelector.lua"
+          $sourceFiles = Get-Content plugins.txt | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+
+          if (-not $sourceFiles) {
+            throw "plugins.txt does not contain any plugin source files"
           }
 
-          foreach ($entry in $sourceFiles.GetEnumerator()) {
-            if (-not (Test-Path $entry.Value -PathType Leaf)) {
-              throw "missing release source file: $($entry.Value)"
+          $destinationNames = @{}
+
+          foreach ($sourceFile in $sourceFiles) {
+            if (-not (Test-Path $sourceFile -PathType Leaf)) {
+              throw "missing release source file: $sourceFile"
             }
 
-            Copy-Item $entry.Value (Join-Path "dist/release" $entry.Key)
+            $fileName = [System.IO.Path]::GetFileName($sourceFile)
+
+            if ($destinationNames.ContainsKey($fileName)) {
+              throw "duplicate plugin release filename: $fileName"
+            }
+
+            $destinationNames[$fileName] = $true
+            Copy-Item $sourceFile (Join-Path "dist/release" $fileName)
           }
 
       - name: prepare release notes
@@ -129,9 +135,4 @@ jobs:
           files: |
             dist/release/pa-combine.exe
             dist/release/sync_backend.exe
-            dist/release/paTools.lua
-            dist/release/PASync.lua
-            dist/release/combinePlugin.lua
-            dist/release/districtMapper.lua
-            dist/release/holeCutter.lua
-            dist/release/worldSelector.lua
+            dist/release/*.lua
