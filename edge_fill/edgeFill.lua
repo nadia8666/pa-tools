@@ -501,11 +501,14 @@ local function makeFence(edge, outward, normal, mirrorSide, part)
 	end
 	clone.Size = size
 	local halfHeight = if axis == "X" then size.Y / 2 else size.X / 2
-	local position = (edge.first + edge.second) / 2 - outward * (size.Z / 2) + normal * halfHeight
+	local midpoint = (edge.first + edge.second) / 2
+	local frame = getFenceFrame(midpoint, edge.tangent, outward, normal, axis)
+	local heightAxis = if axis == "X" then frame.UpVector else frame.RightVector
+	local position = midpoint - frame.LookVector * (size.Z / 2) + heightAxis * halfHeight
 	if mirrorSide then
 		position += part.CFrame.RightVector * part.Size.X
 	end
-	clone.CFrame = getFenceFrame(position, edge.tangent, outward, normal, axis)
+	clone.CFrame = frame + (position - midpoint)
 	clone.CanQuery = false
 	clone.Archivable = false
 	clone.Parent = getPreviewFolder()
