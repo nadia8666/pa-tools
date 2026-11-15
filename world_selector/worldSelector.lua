@@ -135,17 +135,20 @@ local function getTopLevelSelection(part)
 end
 
 local function getNearbyParts(boxes, revision)
+	local radius = 0
 	for _, box in boxes do
 		if not box.Parent then
 			return nil
 		end
+		radius = math.max(radius, box.Size.Magnitude * 0.5)
 	end
 	if revision ~= refreshRevision then
 		return nil
 	end
-	updateProgress("Querying Workspace BaseParts...")
-	local queried = workspace:QueryDescendants("BasePart")
+	updateProgress("Querying nearby Workspace instances...")
+	local queried = workspace:QueryDescendants(string.format("BasePart:in-radius(%.17g, Part#%s)", radius, BOX_NAME))
 	local parts = {}
+	local included = {}
 	for index, instance in queried do
 		if instance:IsA("BasePart") and instance:IsDescendantOf(workspace) then
 			local ancestor = instance.Parent
@@ -158,6 +161,7 @@ local function getNearbyParts(boxes, revision)
 				ancestor = ancestor.Parent
 			end
 			if not insideCamera then
+				included[instance] = true
 				table.insert(parts, instance)
 			end
 		end
@@ -165,7 +169,46 @@ local function getNearbyParts(boxes, revision)
 			if revision ~= refreshRevision then
 				return nil
 			end
-			updateProgress(string.format("Filtering Workspace BaseParts: %d / %d", index, #queried))
+			updateProgress(string.format("Filtering nearby instances: %d / %d", index, #queried))
+			task.wait()
+		end
+	end
+	if revision ~= refreshRevision then
+		return nil
+	end
+	updateProgress("Querying non-queryable Workspace parts...")
+	local nonQueryable = workspace:QueryDescendants("BasePart[CanQuery = false]")
+	for index, instance in nonQueryable do
+		if instance:IsA("BasePart") and instance:IsDescendantOf(workspace) and not included[instance] then
+			local nearestDistance = math.huge
+			for _, box in boxes do
+				local maximumDistance = (box.Size.Magnitude + instance.Size.Magnitude) * 0.5
+				local distance = (instance.Position - box.Position).Magnitude
+				if distance <= maximumDistance then
+					nearestDistance = distance
+					break
+				end
+			end
+			if nearestDistance < math.huge then
+				local ancestor = instance.Parent
+				local insideCamera = false
+				while ancestor and ancestor ~= workspace do
+					if ancestor:IsA("Camera") then
+						insideCamera = true
+						break
+					end
+					ancestor = ancestor.Parent
+				end
+				if not insideCamera then
+					table.insert(parts, instance)
+				end
+			end
+		end
+		if index % CHUNK_SIZE == 0 then
+			if revision ~= refreshRevision then
+				return nil
+			end
+			updateProgress(string.format("Filtering non-queryable parts: %d / %d", index, #nonQueryable))
 			task.wait()
 		end
 	end
@@ -174,6 +217,7 @@ local function getNearbyParts(boxes, revision)
 	end
 	return parts
 end
+
 local function intersects(firstCFrame, firstSize, secondCFrame, secondSize)
 	local firstHalf = { firstSize.X * 0.5, firstSize.Y * 0.5, firstSize.Z * 0.5 }
 	local secondHalf = { secondSize.X * 0.5, secondSize.Y * 0.5, secondSize.Z * 0.5 }
