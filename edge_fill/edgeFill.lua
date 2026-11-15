@@ -750,7 +750,7 @@ local function selectSurface()
 		or isCornerWedge(part)
 		or part:IsA("Part") and (part.Shape == Enum.PartType.Block or isCylinder(part))
 	if not supported then
-		setStatus("Supported surfaces: block, wedge, corner wedge, and cylinder faces.", COLORS.bad)
+		setStatus("Supported surfaces: block, wedge, corner wedge, and cylinder end caps.", COLORS.bad)
 		return false
 	end
 	if mode == "trim" and not (part:IsA("Part") and part.Shape == Enum.PartType.Block or isWedge(part) or isCornerWedge(part)) then
