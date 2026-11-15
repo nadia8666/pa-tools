@@ -536,9 +536,6 @@ local function makeTrim(edge, inward, normal, part)
 		child.Parent = clone
 	end
 	source:Destroy()
-	local size
-	local localTangent = part.CFrame:VectorToObjectSpace(edge.tangent)
-	local lengthAxis = if math.abs(localTangent.X) >= math.abs(localTangent.Z) then "X" else "Z"
 	local length = edge.length - 2 * inset
 	if length <= 0.001 then
 		return
@@ -549,12 +546,7 @@ local function makeTrim(edge, inward, normal, part)
 			edgeCenter += part.CFrame.RightVector * part.Size.X
 		end
 	end
-	if lengthAxis == "X" then
-		size = Vector3.new(length, height, width)
-	else
-		size = Vector3.new(width, height, length)
-	end
-	clone.Size = size
+	clone.Size = Vector3.new(length, height, width)
 	local targetRight = edge.tangent
 	local targetBack = targetRight:Cross(normal).Unit
 	if targetBack:Dot(inward) < 0 then
