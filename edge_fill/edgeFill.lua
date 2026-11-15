@@ -297,7 +297,12 @@ local function getSurfacePolygon(part, worldNormal)
 		local half = part.Size / 2
 		local vertices = {}
 		for _, angle in CYLINDER_ANGLES do
-			table.insert(vertices, part.CFrame:PointToWorldSpace(Vector3.new(sign * half.X, math.cos(angle) * half.Y, math.sin(angle) * half.Z)))
+			table.insert(
+				vertices,
+				part.CFrame:PointToWorldSpace(
+					Vector3.new(sign * half.X, math.cos(angle) * half.Y, math.sin(angle) * half.Z)
+				)
+			)
 		end
 		return vertices
 	end
@@ -484,21 +489,23 @@ local function makeTrim(edge, normal, part)
 	end
 	local source = clonePart(part)
 	local clone = Instance.new("Part")
-	for _, property in {
-		"Anchored",
-		"CanCollide",
-		"CanTouch",
-		"CanQuery",
-		"CastShadow",
-		"Color",
-		"CollisionGroup",
-		"CustomPhysicalProperties",
-		"Material",
-		"MaterialVariant",
-		"Massless",
-		"Reflectance",
-		"Transparency",
-	} do
+	for _, property in
+		{
+			"Anchored",
+			"CanCollide",
+			"CanTouch",
+			"CanQuery",
+			"CastShadow",
+			"Color",
+			"CollisionGroup",
+			"CustomPhysicalProperties",
+			"Material",
+			"MaterialVariant",
+			"Massless",
+			"Reflectance",
+			"Transparency",
+		}
+	do
 		clone[property] = source[property]
 	end
 	for _, child in source:GetChildren() do
@@ -582,7 +589,14 @@ local function buildPreview()
 		clearPreview()
 		setStatus("Preview failed: " .. tostring(err), COLORS.bad)
 	else
-		setStatus(string.format("%d edge pieces previewed across %d surfaces. Adjust settings, then apply.", #previewParts, #selectedSurfaces), COLORS.ok)
+		setStatus(
+			string.format(
+				"%d edge pieces previewed across %d surfaces. Adjust settings, then apply.",
+				#previewParts,
+				#selectedSurfaces
+			),
+			COLORS.ok
+		)
 	end
 end
 
@@ -681,7 +695,16 @@ local function updateSurfaceHighlight()
 			or isCornerWedge(part)
 			or part:IsA("Part") and (part.Shape == Enum.PartType.Block or isCylinder(part))
 		local loops = if supported then getSurfaceLoops(part, ray.Normal) else nil
-		if loops and #loops > 0 and (mode ~= "trim" or isWedge(part) or isCornerWedge(part) or part:IsA("Part") and part.Shape == Enum.PartType.Block) then
+		if
+			loops
+			and #loops > 0
+			and (
+				mode ~= "trim"
+				or isWedge(part)
+				or isCornerWedge(part)
+				or part:IsA("Part") and part.Shape == Enum.PartType.Block
+			)
+		then
 			surfaceHighlight.Adornee = part
 			surfaceHighlight.TargetSurface = getSurfaceNormalId(part, ray.Normal)
 			return
@@ -731,7 +754,10 @@ local function selectSurface()
 		setStatus("Supported surfaces: block, wedge, corner wedge, and cylinder end caps.", COLORS.bad)
 		return false
 	end
-	if mode == "trim" and not (part:IsA("Part") and part.Shape == Enum.PartType.Block or isWedge(part) or isCornerWedge(part)) then
+	if
+		mode == "trim"
+		and not (part:IsA("Part") and part.Shape == Enum.PartType.Block or isWedge(part) or isCornerWedge(part))
+	then
 		setStatus("Trim supports block, wedge, and corner wedge surfaces only.", COLORS.bad)
 		return false
 	end
@@ -767,7 +793,7 @@ local function apply()
 		setStatus("Select supported surfaces and preview edge pieces before applying.", COLORS.bad)
 		return
 	end
-	if (mode == "fence" and not referencePart.Parent) then
+	if mode == "fence" and not referencePart.Parent then
 		setStatus("The reference part no longer exists.", COLORS.bad)
 		return
 	end
@@ -832,7 +858,8 @@ connect(mouse.Move, updateSurfaceHighlight)
 
 connect(mouse.Button1Down, function()
 	if placing and widget.Enabled then
-		local shiftHeld = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
+		local shiftHeld = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
+			or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
 		if not multiSelecting and not shiftHeld then
 			table.clear(selectedSurfaces)
 			for _, connection in surfaceConnections do
@@ -846,7 +873,10 @@ connect(mouse.Button1Down, function()
 		end
 		if shiftHeld then
 			multiSelecting = true
-			setStatus(string.format("%d surfaces selected. Release Shift to finish selection.", #selectedSurfaces), COLORS.ok)
+			setStatus(
+				string.format("%d surfaces selected. Release Shift to finish selection.", #selectedSurfaces),
+				COLORS.ok
+			)
 		else
 			placing = false
 			if surfaceHighlight then
