@@ -485,7 +485,7 @@ local function getLengthAxis(part)
 	return "Z"
 end
 
-local function makeFence(edge, outward, normal, mirrorSide, part)
+local function makeFence(edge, outward, normal)
 	local clone = clonePart(referencePart)
 	local axis = getLengthAxis(referencePart)
 	local size = clone.Size
@@ -505,9 +505,6 @@ local function makeFence(edge, outward, normal, mirrorSide, part)
 	local frame = getFenceFrame(midpoint, edge.tangent, outward, normal, axis)
 	local heightAxis = if axis == "X" then frame.UpVector else frame.RightVector
 	local position = midpoint + frame.LookVector * (size.Z / 2) + heightAxis * halfHeight
-	if mirrorSide then
-		position += part.CFrame.RightVector * part.Size.X
-	end
 	clone.CFrame = frame + (position - midpoint)
 	clone.CanQuery = false
 	clone.Archivable = false
@@ -544,11 +541,6 @@ local function makeTrim(edge, inward, normal, part)
 		return
 	end
 	local edgeCenter = (edge.first + edge.second) / 2 + inward * (inset + width / 2) + normal * (height / 2)
-	if isWedge(part) or isCornerWedge(part) then
-		if part.CFrame:VectorToObjectSpace(normal).X > 0 then
-			edgeCenter += part.CFrame.RightVector * part.Size.X
-		end
-	end
 	clone.Size = Vector3.new(length, height, width)
 	local targetRight = edge.tangent
 	local targetBack = targetRight:Cross(normal).Unit
@@ -582,14 +574,7 @@ local function buildPreview()
 						local outward, inward = getOutward(edge, center, loop.normal)
 						if outward and inward then
 							if mode == "fence" then
-								makeFence(
-								edge,
-								outward,
-								loop.normal,
-								(isWedge(part) or isCornerWedge(part))
-									and part.CFrame:VectorToObjectSpace(loop.normal).X > 0,
-								part
-							)
+								makeFence(edge, outward, loop.normal)
 								previewSources[previewParts[#previewParts]] = part.Parent
 							else
 								makeTrim(edge, inward, loop.normal, part)
