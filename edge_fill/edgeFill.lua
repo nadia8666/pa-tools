@@ -56,6 +56,11 @@ local deletingInwardTextures = false
 local inset = 0
 local width = 2
 local height = 2
+local CYLINDER_SIDES = 24
+local CYLINDER_ANGLES = {}
+for index = 0, CYLINDER_SIDES - 1 do
+	table.insert(CYLINDER_ANGLES, index / CYLINDER_SIDES * math.pi * 2)
+end
 
 local function connect(signal, callback)
 	local connection = signal:Connect(callback)
@@ -289,53 +294,12 @@ local function getSurfacePolygon(part, worldNormal)
 			return nil
 		end
 		local sign = if localNormal.X >= 0 then 1 else -1
-		local params = RaycastParams.new()
-		params.FilterType = Enum.RaycastFilterType.Include
-		params.FilterDescendantsInstances = { part }
-		local radius = math.max(part.Size.Y, part.Size.Z) / 2
-		local points = {}
-		for index = 0, 719 do
-			local angle = index / 720 * math.pi * 2
-			local radial = Vector3.new(0, math.cos(angle), math.sin(angle))
-			local origin = part.CFrame:PointToWorldSpace(radial * radius * 2)
-			local direction = part.CFrame:VectorToWorldSpace(-radial * radius * 4)
-			local hit = workspace:Raycast(origin, direction, params)
-			if hit then
-				local point = part.CFrame:PointToObjectSpace(hit.Position)
-				table.insert(points, Vector2.new(point.Y, point.Z))
-			end
-		end
-		table.sort(points, function(first, second)
-			return first.X == second.X and first.Y < second.Y or first.X < second.X
-		end)
-		local function cross(origin, first, second)
-			return (first.X - origin.X) * (second.Y - origin.Y) - (first.Y - origin.Y) * (second.X - origin.X)
-		end
-		local hull = {}
-		for _, point in points do
-			if #hull == 0 or (point - hull[#hull]).Magnitude > 0.001 then
-				while #hull >= 2 and cross(hull[#hull - 1], hull[#hull], point) <= 0.000001 do
-					table.remove(hull)
-				end
-				table.insert(hull, point)
-			end
-		end
-		local lowerCount = #hull
-		for index = #points - 1, 1, -1 do
-			local point = points[index]
-			while #hull > lowerCount and cross(hull[#hull - 1], hull[#hull], point) <= 0.000001 do
-				table.remove(hull)
-			end
-			table.insert(hull, point)
-		end
-		if #hull > 1 then
-			table.remove(hull)
-		end
+		local half = part.Size / 2
 		local vertices = {}
-		for _, point in hull do
-			table.insert(vertices, part.CFrame:PointToWorldSpace(Vector3.new(sign * part.Size.X / 2, point.X, point.Y)))
+		for _, angle in CYLINDER_ANGLES do
+			table.insert(vertices, part.CFrame:PointToWorldSpace(Vector3.new(sign * half.X, math.cos(angle) * half.Y, math.sin(angle) * half.Z)))
 		end
-		return if #vertices >= 3 then vertices else nil
+		return vertices
 	end
 	local localNormal = part.CFrame:VectorToObjectSpace(worldNormal)
 	local faces = makeFaces(part)
@@ -356,56 +320,34 @@ local function getSurfacePolygon(part, worldNormal)
 	end
 	shapeCenter /= math.max(vertexCount, 1)
 	local selected
-	local selectedDot = -math.huge
+	local selectedDot = 0.75
 	for _, vertices in faces do
-		local normal = faceNormal(vertices, shapeCenter)
-		local dot = math.abs(normal:Dot(localNormal))
+		local dot = faceNormal(vertices, shapeCenter):Dot(localNormal)
 		if dot > selectedDot then
 			selectedDot = dot
 			selected = vertices
 		end
 	end
-	if not selected or selectedDot < 0.75 then
+	if not selected then
 		return nil
 	end
-	local result = table.clone(selected)
-	if faceNormal(result, shapeCenter):Dot(localNormal) < 0 then
-		for index = 1, math.floor(#result / 2) do
-			local opposite = #result - index + 1
-			result[index], result[opposite] = result[opposite], result[index]
-		end
-	end
-	for index, vertex in result do
+	local result = {}
+	for index, vertex in selected do
 		result[index] = part.CFrame:PointToWorldSpace(vertex)
 	end
 	return result
 end
 
 local function getSurfaceLoops(part, worldNormal)
-	if isCylinder(part) then
-		local localNormal = part.CFrame:VectorToObjectSpace(worldNormal)
-		local function makeRing(x)
-			local vertices = getSurfacePolygon(part, part.CFrame.RightVector * (if x >= 0 then 1 else -1))
-			if not vertices then
-				return {}
-			end
-			return vertices
-		end
-		if math.abs(localNormal.X) > 0.85 then
-			return {
-				{
-					vertices = makeRing((if localNormal.X >= 0 then 1 else -1) * part.Size.X / 2),
-					normal = part.CFrame.RightVector * (if localNormal.X >= 0 then 1 else -1),
-				},
-			}
-		end
-		return nil
-	end
 	local vertices = getSurfacePolygon(part, worldNormal)
 	if not vertices then
 		return nil
 	end
-	return { { vertices = vertices, normal = worldNormal } }
+	local normal = (vertices[2] - vertices[1]):Cross(vertices[3] - vertices[1]).Unit
+	if normal:Dot(worldNormal) < 0 then
+		normal = -normal
+	end
+	return { { vertices = vertices, normal = normal } }
 end
 
 local function getCentroid(vertices)
@@ -416,52 +358,54 @@ local function getCentroid(vertices)
 	return center / #vertices
 end
 
-local function getEdges(vertices)
+local function getEdges(vertices, normal)
+	local center = getCentroid(vertices)
 	local edges = {}
 	for index, first in vertices do
 		local second = vertices[index % #vertices + 1]
 		local delta = second - first
 		if delta.Magnitude > 0.001 then
+			local tangent = delta.Unit
+			local inward = normal:Cross(tangent).Unit
+			if inward:Dot(center - (first + second) / 2) < 0 then
+				inward = -inward
+			end
 			table.insert(edges, {
 				first = first,
 				second = second,
-				tangent = delta.Unit,
+				tangent = tangent,
+				inward = inward,
 				length = delta.Magnitude,
+				trimStart = 0,
+				trimEnd = 0,
 			})
 		end
 	end
 	return edges
 end
 
-local function getOutward(edge, center, normal)
-	local midpoint = (edge.first + edge.second) / 2
-	local inward = center - midpoint
-	inward -= normal * inward:Dot(normal)
-	if inward.Magnitude < 0.001 then
-		return nil
-	end
-	return -inward.Unit, inward.Unit
-end
-
-local function getFenceFrame(position, tangent, outward, normal, lengthAxis)
-	if lengthAxis == "Y" then
-		local up = tangent
-		local right = normal
-		local back = right:Cross(up).Unit
-		if back:Dot(outward) < 0 then
-			up = -up
-			back = -back
+local function assignCornerTrims(edges)
+	local count = #edges
+	for index, edge in edges do
+		local nextEdge = edges[index % count + 1]
+		local cosAngle = -edge.tangent:Dot(nextEdge.tangent)
+		local sinAngle = math.sqrt(math.max(0, 1 - cosAngle * cosAngle))
+		if sinAngle > 0.01 then
+			local offset = if cosAngle > 0 then inset + width else inset
+			local owned = (inset + offset * cosAngle) / sinAngle
+			local yielded = (inset + width + offset * cosAngle) / sinAngle
+			if cosAngle < 0 then
+				yielded = math.min(yielded, math.max(0, ((inset + width) * sinAngle - owned) / -cosAngle))
+			end
+			if index % 2 == 1 then
+				edge.trimEnd = owned
+				nextEdge.trimStart = yielded
+			else
+				edge.trimEnd = yielded
+				nextEdge.trimStart = owned
+			end
 		end
-		return CFrame.fromMatrix(position, right, up, back)
 	end
-	local right = tangent
-	local up = normal
-	local back = right:Cross(up).Unit
-	if back:Dot(outward) < 0 then
-		right = -right
-		back = -back
-	end
-	return CFrame.fromMatrix(position, right, up, back)
 end
 
 local function removeInwardTextures(clone, inward)
@@ -476,42 +420,68 @@ local function removeInwardTextures(clone, inward)
 	end
 end
 
-local function getLengthAxis(part)
-	if part.Size.X >= part.Size.Y and part.Size.X >= part.Size.Z then
-		return "X"
-	elseif part.Size.Y >= part.Size.Z then
-		return "Y"
-	end
-	return "Z"
+local function setComponent(size, index, value)
+	local components = { size.X, size.Y, size.Z }
+	components[index] = value
+	return Vector3.new(components[1], components[2], components[3])
 end
 
-local function makeFence(edge, outward, normal)
+local function rotationBetween(from, to)
+	local axis = from:Cross(to)
+	if axis.Magnitude < 0.000001 then
+		return CFrame.identity
+	end
+	return CFrame.fromAxisAngle(axis.Unit, math.acos(math.clamp(from:Dot(to), -1, 1)))
+end
+
+local function makeFence(edge, normal)
 	local clone = clonePart(referencePart)
-	local axis = getLengthAxis(referencePart)
 	local size = clone.Size
-	if axis == "Z" then
-		size = Vector3.new(size.Z, size.Y, size.X)
-		axis = "X"
+	local sizes = { size.X, size.Y, size.Z }
+	local order = { 1, 2, 3 }
+	table.sort(order, function(first, second)
+		if sizes[first] == sizes[second] then
+			return first < second
+		end
+		return sizes[first] > sizes[second]
+	end)
+	local lengthIndex, heightIndex, thicknessIndex = order[1], order[2], order[3]
+	local function getThickness(tangent)
+		local columns = {}
+		columns[lengthIndex] = tangent
+		columns[heightIndex] = normal
+		if thicknessIndex == 3 then
+			return columns[1]:Cross(columns[2])
+		elseif thicknessIndex == 1 then
+			return columns[2]:Cross(columns[3])
+		end
+		return columns[3]:Cross(columns[1])
 	end
-	local targetLength = edge.length
-	if axis == "X" then
-		size = Vector3.new(targetLength, size.Y, size.Z)
-	else
-		size = Vector3.new(size.X, targetLength, size.Z)
+	local tangent = edge.tangent
+	local thickness = getThickness(tangent)
+	if thickness:Dot(edge.inward) < 0 then
+		tangent = -tangent
+		thickness = -thickness
 	end
-	clone.Size = size
-	local halfHeight = if axis == "X" then size.Y / 2 else size.X / 2
+	local columns = {}
+	columns[lengthIndex] = tangent
+	columns[heightIndex] = normal
+	columns[thicknessIndex] = thickness
 	local midpoint = (edge.first + edge.second) / 2
-	local frame = getFenceFrame(midpoint, edge.tangent, outward, normal, axis)
-	local position = midpoint + normal * halfHeight + frame.LookVector * (size.Z / 2)
-	clone.CFrame = frame + (position - midpoint)
+	local center = midpoint + normal * (sizes[heightIndex] / 2) + edge.inward * (sizes[thicknessIndex] / 2)
+	clone.Size = setComponent(size, lengthIndex, edge.length)
+	clone.CFrame = CFrame.fromMatrix(center, columns[1], columns[2], columns[3])
 	clone.CanQuery = false
 	clone.Archivable = false
 	clone.Parent = getPreviewFolder()
 	table.insert(previewParts, clone)
 end
 
-local function makeTrim(edge, inward, normal, part)
+local function makeTrim(edge, normal, part)
+	local length = edge.length - edge.trimStart - edge.trimEnd
+	if length <= 0.001 then
+		return
+	end
 	local source = clonePart(part)
 	local clone = Instance.new("Part")
 	for _, property in {
@@ -535,21 +505,45 @@ local function makeTrim(edge, inward, normal, part)
 		child.Parent = clone
 	end
 	source:Destroy()
-	local length = edge.length - 2 * inset
-	if length <= 0.001 then
-		return
+	local base = part.CFrame.Rotation
+	local axes = { base.XVector, base.YVector, base.ZVector }
+	local heightIndex, heightDot = 1, -1
+	for index, axis in axes do
+		local dot = math.abs(axis:Dot(normal))
+		if dot > heightDot then
+			heightIndex, heightDot = index, dot
+		end
 	end
-	local edgeCenter = (edge.first + edge.second) / 2 + inward * (inset + width / 2) + normal * (height / 2)
-	clone.Size = Vector3.new(length, height, width)
-	local targetRight = edge.tangent
-	local targetBack = targetRight:Cross(normal).Unit
-	if targetBack:Dot(inward) < 0 then
-		targetRight = -targetRight
-		targetBack = -targetBack
+	local lengthIndex, lengthDot = 1, -1
+	for index, axis in axes do
+		if index ~= heightIndex then
+			local dot = math.abs(axis:Dot(edge.tangent))
+			if dot > lengthDot then
+				lengthIndex, lengthDot = index, dot
+			end
+		end
 	end
-	clone.CFrame = CFrame.fromMatrix(edgeCenter, targetRight, normal, targetBack)
+	local widthIndex = 6 - heightIndex - lengthIndex
+	local up = axes[heightIndex] * (if axes[heightIndex]:Dot(normal) >= 0 then 1 else -1)
+	local rotation = rotationBetween(up, normal) * base
+	local lengthAxis = ({ rotation.XVector, rotation.YVector, rotation.ZVector })[lengthIndex]
+	local flat = lengthAxis - normal * lengthAxis:Dot(normal)
+	if flat.Magnitude > 0.001 then
+		local target = edge.tangent * (if flat:Dot(edge.tangent) >= 0 then 1 else -1)
+		rotation = CFrame.fromAxisAngle(normal, math.atan2(normal:Dot(flat:Cross(target)), flat:Dot(target))) * rotation
+	end
+	local size = Vector3.zero
+	size = setComponent(size, heightIndex, height)
+	size = setComponent(size, lengthIndex, length)
+	size = setComponent(size, widthIndex, width)
+	local center = edge.first
+		+ edge.tangent * (edge.trimStart + length / 2)
+		+ edge.inward * (inset + width / 2)
+		+ normal * (height / 2)
+	clone.Size = size
+	clone.CFrame = CFrame.new(center) * rotation
 	if deletingInwardTextures then
-		removeInwardTextures(clone, inward)
+		removeInwardTextures(clone, edge.inward)
 	end
 	clone.CanQuery = false
 	clone.Archivable = false
@@ -568,16 +562,16 @@ local function buildPreview()
 			local part = surface.part
 			if part.Parent then
 				for _, loop in surface.loops do
-					local center = getCentroid(loop.vertices)
-					for _, edge in getEdges(loop.vertices) do
-						local outward, inward = getOutward(edge, center, loop.normal)
-						if outward and inward then
-							if mode == "fence" then
-								makeFence(edge, outward, loop.normal)
-								previewSources[previewParts[#previewParts]] = part.Parent
-							else
-								makeTrim(edge, inward, loop.normal, part)
-							end
+					local edges = getEdges(loop.vertices, loop.normal)
+					if mode == "trim" then
+						assignCornerTrims(edges)
+					end
+					for _, edge in edges do
+						if mode == "fence" then
+							makeFence(edge, loop.normal)
+							previewSources[previewParts[#previewParts]] = part.Parent
+						else
+							makeTrim(edge, loop.normal, part)
 						end
 					end
 				end
