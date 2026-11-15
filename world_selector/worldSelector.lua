@@ -180,16 +180,15 @@ local function getNearbyParts(boxes, revision)
 	local nonQueryable = workspace:QueryDescendants("BasePart[CanQuery = false]")
 	for index, instance in nonQueryable do
 		if instance:IsA("BasePart") and instance:IsDescendantOf(workspace) and not included[instance] then
-			local nearestDistance = math.huge
+			local closeEnough = false
 			for _, box in boxes do
 				local maximumDistance = (box.Size.Magnitude + instance.Size.Magnitude) * 0.5
-				local distance = (instance.Position - box.Position).Magnitude
-				if distance <= maximumDistance then
-					nearestDistance = distance
+				if (instance.Position - box.Position).Magnitude <= maximumDistance then
+					closeEnough = true
 					break
 				end
 			end
-			if nearestDistance < math.huge then
+			if closeEnough then
 				local ancestor = instance.Parent
 				local insideCamera = false
 				while ancestor and ancestor ~= workspace do
