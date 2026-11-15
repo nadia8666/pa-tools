@@ -135,19 +135,16 @@ local function getTopLevelSelection(part)
 end
 
 local function getNearbyParts(boxes, revision)
-	local radius = 0
 	for _, box in boxes do
 		if not box.Parent then
 			return nil
 		end
-		radius = math.max(radius, box.Size.Magnitude * 0.5)
 	end
 	if revision ~= refreshRevision then
 		return nil
 	end
-	updateProgress("Querying nearby Workspace instances...")
-	local selector = string.format("BasePart:in-radius(%.17g, Part#%s)", radius, BOX_NAME)
-	local queried = workspace:QueryDescendants(selector)
+	updateProgress("Querying Workspace BaseParts...")
+	local queried = workspace:QueryDescendants("BasePart")
 	local parts = {}
 	for index, instance in queried do
 		if instance:IsA("BasePart") and instance:IsDescendantOf(workspace) then
