@@ -42,6 +42,7 @@ pub fn load(root: &Path, sourcemap: &Path) -> Option<Map> {
 fn walk(node: &Node, prefix: &mut Vec<String>, root: &Path, map: &mut Map) {
     prefix.push(node.name.clone());
     map.classes.push((prefix.clone(), node.class_name.clone()));
+    let mut has_dir = false;
 
     if matches!(node.class_name.as_str(), "Script" | "LocalScript" | "ModuleScript") {
         let file = node
@@ -56,6 +57,7 @@ fn walk(node: &Node, prefix: &mut Vec<String>, root: &Path, map: &mut Map) {
             if is_init {
                 if let Some(parent) = full.parent() {
                     map.dirs.push((prefix.clone(), parent.to_path_buf()));
+                    has_dir = true;
                 }
             }
             map.scripts.push(Entry {
@@ -73,10 +75,40 @@ fn walk(node: &Node, prefix: &mut Vec<String>, root: &Path, map: &mut Map) {
         .find(|p| p.is_dir())
     {
         map.dirs.push((prefix.clone(), dir));
+        has_dir = true;
     }
 
     for child in &node.children {
         walk(child, prefix, root, map);
     }
+
+    // A Folder made from a directory has no filePaths of its own in the sourcemap, so its
+    // directory is read off its children instead.
+    if !has_dir && node.class_name == "Folder" {
+        if let Some(dir) = derive_dir(prefix, map) {
+            map.dirs.push((prefix.clone(), dir));
+        }
+    }
     prefix.pop();
+}
+
+// The directory a Folder maps to, from what is inside it: a plain script file sits directly in it,
+// and a child directory (an init script's or another Folder's) has it as its parent.
+fn derive_dir(prefix: &[String], map: &Map) -> Option<PathBuf> {
+    let is_child = |path: &Vec<String>| path.len() == prefix.len() + 1 && path.starts_with(prefix);
+    for entry in &map.scripts {
+        let init = entry
+            .file
+            .file_name()
+            .map_or(false, |n| n.to_string_lossy().starts_with("init."));
+        if is_child(&entry.path) && !init {
+            return entry.file.parent().map(Path::to_path_buf);
+        }
+    }
+    for (path, dir) in &map.dirs {
+        if is_child(path) {
+            return dir.parent().map(Path::to_path_buf);
+        }
+    }
+    None
 }

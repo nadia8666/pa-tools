@@ -17,6 +17,16 @@ local OPEN_CONCURRENCY = 12
 local CREATE_DEBOUNCE = 3
 local CHANGE_DEBOUNCE = 1.5
 local CHECK_INTERVAL = 1
+local SCAN_BATCH = 90
+local SCAN_SERVICES = {
+	"Workspace",
+	"ReplicatedFirst",
+	"ReplicatedStorage",
+	"ServerScriptService",
+	"ServerStorage",
+	"StarterGui",
+	"StarterPlayer",
+}
 local SEP = "\31"
 
 local scripts = {}
@@ -30,6 +40,9 @@ local watched = {}
 local changes = {}
 local outbox = { created = {}, deleted = {}, moved = {}, missing = {}, refused = {} }
 local resync = false
+local trackedReady = false
+local scanned = false
+local scanQueue = {}
 local openActive = 0
 local nextCheck = 0
 local lastReported = {}
@@ -1069,15 +1082,20 @@ local function onDescendantAdded(instance)
 	end
 end
 
-local function watchRoots(paths)
-	for _, path in paths do
-		local name = path[1]
-		local service = name and game:FindFirstChild(name)
-		if service and not watched[name] then
-			watched[name] = service.DescendantAdded:Connect(onDescendantAdded)
-		end
+local function watchService(service)
+	if not watched[service] then
+		watched[service] = service.DescendantAdded:Connect(onDescendantAdded)
 	end
 end
+
+local function watchServices()
+	for _, service in game:GetChildren() do
+		watchService(service)
+	end
+end
+
+watchServices()
+game.ChildAdded:Connect(watchService)
 
 local function rebuildTracked(paths)
 	local wanted = {}
@@ -1105,10 +1123,38 @@ local function rebuildTracked(paths)
 		end
 	end
 	resync = false
-	watchRoots(paths)
+end
+
+local function queueExisting()
+	table.clear(scanQueue)
+	for _, name in SCAN_SERVICES do
+		local service = game:FindFirstChild(name)
+		if service then
+			for _, descendant in service:GetDescendants() do
+				if descendant:IsA("LuaSourceContainer") and not keyByScript[descendant] then
+					rejected[descendant] = nil
+					table.insert(scanQueue, descendant)
+				end
+			end
+		end
+	end
+end
+
+local function drainScanQueue()
+	local now = os.clock()
+	for _ = 1, math.min(SCAN_BATCH, #scanQueue) do
+		local instance = table.remove(scanQueue, 1)
+		if not keyByScript[instance] and instance:IsDescendantOf(game) then
+			candidates[instance] = now - CREATE_DEBOUNCE
+		end
+	end
 end
 
 local function checkCandidates()
+	if not trackedReady then
+		return
+	end
+	drainScanQueue()
 	local now = os.clock()
 	local ready = {}
 	for instance, at in candidates do
@@ -1558,6 +1604,7 @@ local function onMessage(message)
 		return
 	end
 	paused = response.paused
+	trackedReady = true
 	for _, deleted in response.deletes or {} do
 		local deleteOk, deleteError = pcall(applyDelete, deleted)
 		if not deleteOk then
@@ -1566,6 +1613,13 @@ local function onMessage(message)
 	end
 	if response.tracked then
 		rebuildTracked(response.tracked)
+	end
+	if response.rescan then
+		scanned = false
+	end
+	if not scanned then
+		scanned = true
+		queueExisting()
 	end
 	for _, event in response.events or {} do
 		log(table.concat(event.path, SEP), "RBX", rowsFromEdits(event.edits))
@@ -1640,6 +1694,9 @@ local function connect()
 	created.Opened:Connect(function()
 		connected = true
 		syncIgnored = false
+		trackedReady = false
+		scanned = false
+		table.clear(scanQueue)
 		setStatus("Checking .psync project identity...")
 		resync = true
 		for _, list in outbox do

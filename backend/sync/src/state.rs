@@ -56,6 +56,8 @@ const DEFER_TTL: Duration = Duration::from_secs(15);
 // Texts remembered per script that went to Studio through this backend. Studio showing one of
 // them is not a Studio edit.
 const PUSHED_KEEP: usize = 16;
+// The one reason a Studio script is listed in psync.unmapped.json instead of reported as an error.
+const NO_DIR: &str = "no mapped directory above this script";
 
 #[derive(Deserialize)]
 pub struct Report {
@@ -206,6 +208,8 @@ pub struct SyncResponse {
     pub notices: Vec<Notice>,
     #[serde(rename = "attrCommands", skip_serializing_if = "Vec::is_empty")]
     pub attr_commands: Vec<AttrCommand>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub rescan: bool,
     pub paused: bool,
     pub ignored: bool,
     pub message: String,
@@ -703,6 +707,9 @@ pub struct State {
     node_classes: HashMap<String, String>,
     overrides: HashMap<String, (String, String)>,
     overrides_stamp: Option<SystemTime>,
+    unmapped: BTreeSet<String>,
+    unmapped_stamp: Option<SystemTime>,
+    rescan: bool,
     authorized: bool,
     place_id: Option<u64>,
 }
@@ -739,6 +746,9 @@ impl State {
             node_classes: HashMap::new(),
             overrides: HashMap::new(),
             overrides_stamp: None,
+            unmapped: BTreeSet::new(),
+            unmapped_stamp: None,
+            rescan: false,
             authorized: false,
             place_id: None,
         };
@@ -845,6 +855,50 @@ impl State {
                 Item::Create(created) => self.create_from_studio(created, entry.first_seen),
                 Item::Move(moved) => self.move_from_studio(moved, entry.first_seen),
             }
+        }
+    }
+
+    // psync.unmapped.json next to the sourcemap: Studio scripts with no mapped directory above them,
+    // as "ReplicatedStorage/Foo/Bar" strings. They are skipped silently instead of reported on
+    // every connect. Delete an entry (and reconnect) to let that script sync.
+    fn unmapped_file(&self) -> PathBuf {
+        self.sourcemap.with_file_name("psync.unmapped.json")
+    }
+
+    fn refresh_unmapped(&mut self) {
+        let file = self.unmapped_file();
+        let stamp = fs::metadata(&file).and_then(|m| m.modified()).ok();
+        if stamp == self.unmapped_stamp {
+            return;
+        }
+        self.unmapped_stamp = stamp;
+        let next: BTreeSet<String> = match fs::read_to_string(&file) {
+            Ok(text) => match serde_json::from_str::<Vec<String>>(&text) {
+                Ok(list) => list.into_iter().collect(),
+                Err(_) => {
+                    println!("psync.unmapped.json is not a JSON array of strings, ignored");
+                    return;
+                }
+            },
+            Err(_) => BTreeSet::new(),
+        };
+        // An entry taken out of the list means that script should sync now: Studio is asked to
+        // send everything in the scanned services again.
+        if self.unmapped.iter().any(|p| !next.contains(p)) {
+            self.rescan = true;
+        }
+        self.unmapped = next;
+        println!("unmapped: {} entries", self.unmapped.len());
+    }
+
+    fn save_unmapped(&mut self) {
+        let file = self.unmapped_file();
+        let list: Vec<&String> = self.unmapped.iter().collect();
+        let Ok(text) = serde_json::to_string_pretty(&list) else {
+            return;
+        };
+        if fs::write(&file, text + "\n").is_ok() {
+            self.unmapped_stamp = fs::metadata(&file).and_then(|m| m.modified()).ok();
         }
     }
 
@@ -1090,6 +1144,7 @@ impl State {
         }
         self.refresh_sourcemap();
         self.refresh_overrides();
+        self.refresh_unmapped();
 
         let now = Instant::now();
         let holding = self.git_holding();
@@ -1304,7 +1359,7 @@ impl State {
         let mut start = parent_len;
         let mut dir = loop {
             if start == 0 {
-                return Err("no mapped directory above this script".to_string());
+                return Err(NO_DIR.to_string());
             }
             if let Some((_, dir)) = self.dirs.get(&key(&path[..start])) {
                 break dir.clone();
@@ -1371,6 +1426,11 @@ impl State {
         if self.scripts.contains_key(&k) {
             return;
         }
+        self.refresh_unmapped();
+        let listed = created.path.join("/");
+        if self.unmapped.contains(&listed) {
+            return;
+        }
         // A script inside another new script waits for it to be synced first.
         if first_seen.elapsed() < DEFER_TTL && self.ancestor_pending(&created.path, &created.classes) {
             self.deferred.push(Deferred { first_seen, item: Item::Create(created) });
@@ -1383,6 +1443,12 @@ impl State {
             &created.run_context,
         ) {
             Ok(file) => file,
+            Err(e) if e == NO_DIR => {
+                println!("unmapped, listed in psync.unmapped.json: {listed}");
+                self.unmapped.insert(listed);
+                self.save_unmapped();
+                return;
+            }
             Err(e) => {
                 let text = format!("Not synced: {e}");
                 self.notice("ERR", &created.path, "err", String::new(), text);
@@ -1783,6 +1849,7 @@ impl State {
         self.attr_cmds.clear();
         self.events.clear();
         self.creates.clear();
+        self.rescan = false;
         self.deletes.clear();
         self.notices.clear();
     }
@@ -1811,6 +1878,7 @@ impl State {
                 deletes: Vec::new(),
                 notices: Vec::new(),
                 attr_commands: Vec::new(),
+                rescan: false,
                 paused: false,
                 ignored: true,
                 message: client.message.clone(),
@@ -1838,6 +1906,7 @@ impl State {
         let deletes = std::mem::take(&mut self.deletes);
         let notices = std::mem::take(&mut self.notices);
         let attr_commands = std::mem::take(&mut self.attr_cmds);
+        let rescan = std::mem::take(&mut self.rescan);
         let message = self.message();
 
         if tracked.is_none()
@@ -1847,6 +1916,7 @@ impl State {
             && deletes.is_empty()
             && notices.is_empty()
             && attr_commands.is_empty()
+            && !rescan
             && message == client.message
         {
             return None;
@@ -1862,6 +1932,7 @@ impl State {
             deletes,
             notices,
             attr_commands,
+            rescan,
             paused: self.paused,
             ignored: false,
             message,
