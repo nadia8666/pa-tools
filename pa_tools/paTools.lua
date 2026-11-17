@@ -23,7 +23,7 @@ ui.colors = {
 	bad = Color3.fromRGB(235, 90, 90),
 	root = Color3.new(0.098039, 0.101961, 0.105882),
 	card = Color3.new(0.086275, 0.090196, 0.105882),
-	button = Color3.new(0.066667, 0.058824, 0.058824),
+	button = Color3.fromRGB(46, 47, 62),
 }
 
 local colors = ui.colors
