@@ -12,21 +12,6 @@ end
 
 local MAX_MESH_SIZE = 2048
 
-local COLORS = {
-	top = Color3.fromRGB(32, 34, 48),
-	bottom = Color3.fromRGB(22, 23, 30),
-	panel = Color3.fromRGB(22, 23, 27),
-	panelDark = Color3.fromRGB(22, 23, 32),
-	stroke = Color3.fromRGB(78, 82, 108),
-	text = Color3.fromRGB(230, 232, 240),
-	sub = Color3.fromRGB(140, 145, 168),
-	accent = Color3.fromRGB(88, 140, 255),
-	accentDark = Color3.fromRGB(58, 98, 210),
-	ok = Color3.fromRGB(80, 200, 120),
-	warn = Color3.fromRGB(235, 180, 60),
-	bad = Color3.fromRGB(235, 90, 90),
-}
-
 local toolbar = shared.paTools
 while
 	not (
@@ -40,6 +25,8 @@ do
 	task.wait()
 	toolbar = shared.paTools
 end
+local ui = toolbar.ui
+local COLORS = ui.colors
 local toggleButton
 
 local widgetInfo = DockWidgetPluginGuiInfo.new(Enum.InitialDockState.Right, true, false, 300, 520, 260, 360)
@@ -86,105 +73,24 @@ local function connect(signal, callback)
 	return connection
 end
 
-local function create(className, properties, parent)
-	local instance = Instance.new(className)
-	for key, value in properties do
-		instance[key] = value
-	end
-	instance.Parent = parent
-	return instance
-end
+local create = ui.create
 
-local root = create("ScrollingFrame", {
-	Size = UDim2.fromScale(1, 1),
-	BackgroundColor3 = COLORS.bottom,
-	BorderSizePixel = 0,
-	CanvasSize = UDim2.fromOffset(0, 0),
-	AutomaticCanvasSize = Enum.AutomaticSize.Y,
-	ScrollingDirection = Enum.ScrollingDirection.Y,
-	ScrollBarThickness = 5,
-	ScrollBarImageColor3 = COLORS.sub,
-}, widget)
+local _, root = ui.page(widget)
 
-create("UIPadding", {
-	PaddingTop = UDim.new(0, 12),
-	PaddingBottom = UDim.new(0, 12),
-	PaddingLeft = UDim.new(0, 12),
-	PaddingRight = UDim.new(0, 12),
-}, root)
-
-create("UIListLayout", {
-	Padding = UDim.new(0, 8),
-	SortOrder = Enum.SortOrder.LayoutOrder,
-}, root)
-
-local function makeLabel(text, height, order, parent)
-	return create("TextLabel", {
-		Size = UDim2.new(1, 0, 0, height),
-		BackgroundTransparency = 1,
-		Font = Enum.Font.Gotham,
-		TextSize = 13,
-		TextColor3 = COLORS.text,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextWrapped = true,
-		Text = text,
-		LayoutOrder = order,
-	}, parent or root)
+local function makeLabel(text, _height, order, parent)
+	return ui.label(parent or root, text, order)
 end
 
 local function makeButton(text, order, callback, parent)
-	local button = create("TextButton", {
-		Size = UDim2.new(1, 0, 0, 34),
-		BackgroundColor3 = COLORS.panel,
-		BorderSizePixel = 0,
-		Font = Enum.Font.GothamMedium,
-		TextSize = 13,
-		TextColor3 = COLORS.text,
-		Text = text,
-		AutoButtonColor = true,
-		LayoutOrder = order,
-	}, parent or root)
-	create("UICorner", { CornerRadius = UDim.new(0, 6) }, button)
-	create("UIStroke", { Color = COLORS.stroke, Thickness = 1, Transparency = 0.35 }, button)
-	button.Activated:Connect(callback)
-	return button
+	return ui.button(parent or root, text, order, callback)
 end
 
 local function makeInput(placeholder, order, parent)
-	return create("TextBox", {
-		Size = UDim2.new(1, 0, 0, 32),
-		BackgroundColor3 = COLORS.panelDark,
-		BorderSizePixel = 0,
-		Font = Enum.Font.Code,
-		TextSize = 14,
-		TextColor3 = COLORS.text,
-		PlaceholderColor3 = COLORS.sub,
-		PlaceholderText = placeholder,
-		Text = "",
-		ClearTextOnFocus = false,
-		LayoutOrder = order,
-	}, parent or root)
+	return ui.input(parent or root, order, "", placeholder)
 end
 
 local function makePanel(order)
-	local panel = create("Frame", {
-		Size = UDim2.new(1, 0, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundColor3 = COLORS.panel,
-		BackgroundTransparency = 0.2,
-		BorderSizePixel = 0,
-		LayoutOrder = order,
-	}, root)
-	create("UICorner", { CornerRadius = UDim.new(0, 8) }, panel)
-	create("UIStroke", { Color = COLORS.stroke, Thickness = 1, Transparency = 0.45 }, panel)
-	create("UIPadding", {
-		PaddingTop = UDim.new(0, 8),
-		PaddingBottom = UDim.new(0, 8),
-		PaddingLeft = UDim.new(0, 8),
-		PaddingRight = UDim.new(0, 8),
-	}, panel)
-	create("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, panel)
-	return panel
+	return ui.card(root, order)
 end
 
 local statusLabel = makeLabel("Create a group to begin.", 38, 1)

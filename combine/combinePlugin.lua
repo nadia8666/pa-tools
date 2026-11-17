@@ -35,196 +35,49 @@ local widget = plugin:CreateDockWidgetPluginGuiAsync(
 )
 widget.Title = "Combine"
 
-local colors = {
-	top = Color3.fromRGB(32, 34, 48),
-	bottom = Color3.fromRGB(16, 17, 23),
-	panel = Color3.fromRGB(40, 42, 58),
-	panelDark = Color3.fromRGB(22, 23, 32),
-	stroke = Color3.fromRGB(78, 82, 108),
-	text = Color3.fromRGB(230, 232, 240),
-	sub = Color3.fromRGB(140, 145, 168),
-	accent = Color3.fromRGB(88, 140, 255),
-	accentDark = Color3.fromRGB(58, 98, 210),
-	ok = Color3.fromRGB(80, 200, 120),
-	warn = Color3.fromRGB(235, 180, 60),
-	bad = Color3.fromRGB(235, 90, 90),
-}
+local ui = toolbar.ui
+local colors = ui.colors
+local corner, stroke, pad, stack = ui.corner, ui.stroke, ui.pad, ui.stack
 
-local function corner(parent, radius)
-	local value = Instance.new("UICorner")
-	value.CornerRadius = UDim.new(0, radius)
-	value.Parent = parent
-end
-
-local function stroke(parent, color, transparency)
-	local value = Instance.new("UIStroke")
-	value.Color = color
-	value.Transparency = transparency
-	value.Thickness = 1
-	value.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	value.Parent = parent
-end
-
-local function pad(parent, amount)
-	local value = Instance.new("UIPadding")
-	value.PaddingTop = UDim.new(0, amount)
-	value.PaddingBottom = UDim.new(0, amount)
-	value.PaddingLeft = UDim.new(0, amount)
-	value.PaddingRight = UDim.new(0, amount)
-	value.Parent = parent
-end
-
-local function stack(parent, spacing)
-	local value = Instance.new("UIListLayout")
-	value.SortOrder = Enum.SortOrder.LayoutOrder
-	value.Padding = UDim.new(0, spacing)
-	value.Parent = parent
-end
-
-local root = Instance.new("Frame")
-root.Size = UDim2.fromScale(1, 1)
-root.BackgroundColor3 = Color3.new(0.098039, 0.101961, 0.105882)
-root.BorderSizePixel = 0
-root.Parent = widget
-
-local page = Instance.new("ScrollingFrame")
-page.Size = UDim2.fromScale(1, 1)
-page.BackgroundTransparency = 1
-page.BorderSizePixel = 0
-page.ScrollBarThickness = 4
-page.ScrollBarImageColor3 = colors.stroke
-page.AutomaticCanvasSize = Enum.AutomaticSize.Y
-page.CanvasSize = UDim2.new()
-page.Parent = root
-pad(page, 10)
-stack(page, 10)
+local root, page = ui.page(widget)
 
 local function makeCard(order)
-	local card = Instance.new("Frame")
-	card.Size = UDim2.new(1, 0, 0, 0)
-	card.AutomaticSize = Enum.AutomaticSize.Y
-	card.BackgroundColor3 = Color3.new(0.086275, 0.090196, 0.105882)
-	card.BackgroundTransparency = 0.2
-	card.BorderSizePixel = 0
-	card.LayoutOrder = order
-	card.Parent = page
-	corner(card, 10)
-	stroke(card, colors.stroke, 0.5)
-	pad(card, 10)
-	stack(card, 6)
-	return card
+	return ui.card(page, order)
 end
 
 local header = makeCard(1)
 local operations = makeCard(2)
-local settings = makeCard(3)
+local settings = ui.section(page, "ADVANCED SETTINGS", 3)
 
-local function createLabel(text, height, color, order, parent)
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, 0, 0, height)
-	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.Gotham
-	label.TextSize = 12
-	label.TextColor3 = color
-	label.TextWrapped = true
-	label.TextXAlignment = Enum.TextXAlignment.Left
-	label.TextYAlignment = Enum.TextYAlignment.Center
-	label.Text = text
-	label.LayoutOrder = order
-	label.Parent = parent
-	return label
+local function createLabel(text, _height, color, order, parent)
+	return ui.label(parent, text, order, color)
 end
 
-local title = createLabel("Combine", 22, colors.text, 1, header)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 18
+local title = ui.title(header, "Combine", 1)
 
 createLabel("Bake selected geometry into optimized MeshParts.", 18, colors.sub, 2, header)
 
 local status = createLabel("Worker disconnected. Start the Combine worker to continue.", 0, colors.sub, 1, operations)
-status.AutomaticSize = Enum.AutomaticSize.Y
 
-local errorDetails = Instance.new("TextBox")
-errorDetails.Size = UDim2.new(1, 0, 0, 0)
-errorDetails.AutomaticSize = Enum.AutomaticSize.Y
-errorDetails.BackgroundColor3 = colors.panelDark
-errorDetails.BorderSizePixel = 0
-errorDetails.Font = Enum.Font.Code
-errorDetails.TextSize = 11
-errorDetails.TextColor3 = colors.bad
-errorDetails.TextWrapped = true
-errorDetails.TextXAlignment = Enum.TextXAlignment.Left
-errorDetails.TextYAlignment = Enum.TextYAlignment.Top
-errorDetails.ClearTextOnFocus = false
-errorDetails.MultiLine = true
-errorDetails.TextEditable = false
+local errorDetails = ui.output(operations, 2, colors.bad)
 errorDetails.Visible = false
-errorDetails.LayoutOrder = 2
-errorDetails.Parent = operations
-pad(errorDetails, 8)
-corner(errorDetails, 6)
-stroke(errorDetails, colors.stroke, 0.5)
 
 local selectionStats = createLabel("Selection: 0 instances · 0 geometry parts", 18, colors.text, 2, operations)
 
-local progress = Instance.new("Frame")
-progress.Size = UDim2.new(1, 0, 0, 6)
-progress.BackgroundColor3 = colors.panelDark
-progress.BorderSizePixel = 0
-progress.LayoutOrder = 3
-progress.Parent = operations
-corner(progress, 3)
+local progress, progressFill = ui.progress(operations, 3)
 
-local progressFill = Instance.new("Frame")
-progressFill.Size = UDim2.fromScale(0, 1)
-progressFill.BackgroundColor3 = colors.accent
-progressFill.BorderSizePixel = 0
-progressFill.Parent = progress
-corner(progressFill, 3)
-
-local function createButton(text, order)
-	local button = Instance.new("TextButton")
-	button.Size = UDim2.new(1, 0, 0, 32)
-	button.BackgroundColor3 = Color3.new(0.066667, 0.058824, 0.058824)
-	button.BorderSizePixel = 0
-	button.Font = Enum.Font.GothamBold
-	button.TextSize = 13
-	button.TextColor3 = colors.text
-	button.Text = text
-	button.LayoutOrder = order
-	button.Parent = operations
-	corner(button, 8)
-	return button
+local function createButton(text, order, primary)
+	return ui.button(operations, text, order, nil, primary)
 end
 
 local refreshButton = createButton("Refresh Selection", 4)
 local connectButton = createButton("Connect Worker", 5)
-local inspectButton = createButton("Bake Selection", 6)
+local inspectButton = createButton("Bake Selection", 6, true)
 local cancelButton = createButton("Cancel Bake", 7)
 cancelButton.Visible = false
-inspectButton.BackgroundColor3 = colors.accentDark
-inspectButton.TextColor3 = Color3.new(1, 1, 1)
-
-local settingsTitle = createLabel("ADVANCED SETTINGS", 14, colors.sub, 1, settings)
-settingsTitle.Font = Enum.Font.GothamBold
-settingsTitle.TextSize = 11
 
 createLabel("Maximum triangles per initial asset chunk", 18, colors.sub, 2, settings)
-local chunkInput = Instance.new("TextBox")
-chunkInput.Size = UDim2.new(1, 0, 0, 32)
-chunkInput.BackgroundColor3 = colors.panelDark
-chunkInput.BorderSizePixel = 0
-chunkInput.Font = Enum.Font.Gotham
-chunkInput.TextSize = 13
-chunkInput.TextColor3 = colors.text
-chunkInput.PlaceholderColor3 = colors.sub
-chunkInput.PlaceholderText = "1000–20000"
-chunkInput.ClearTextOnFocus = false
-chunkInput.Text = "20000"
-chunkInput.LayoutOrder = 3
-chunkInput.Parent = settings
-corner(chunkInput, 8)
-stroke(chunkInput, colors.stroke, 0.5)
+local chunkInput = ui.input(settings, 3, "20000", "1000–20000")
 
 createLabel(
 	"Source textures retain their original dimensions. Oversized GLBs are split automatically after encoding.",
@@ -232,8 +85,7 @@ createLabel(
 	colors.sub,
 	4,
 	settings
-).AutomaticSize =
-	Enum.AutomaticSize.Y
+)
 local maxTrianglesPerChunk = 20000
 
 chunkInput.FocusLost:Connect(function()

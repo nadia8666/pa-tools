@@ -36,6 +36,7 @@ do
 	task.wait()
 	toolbar = shared.paTools
 end
+local ui = toolbar.ui
 
 local connections = {}
 local boxConnections = {}
@@ -769,84 +770,30 @@ local function createGui()
 	gui.IgnoreGuiInset = true
 	gui.Parent = CoreGui
 
-	local panel = Instance.new("Frame")
+	local panel = ui.floating(gui, UDim2.fromOffset(440, 94))
 	panel.Name = "Panel"
-	panel.AnchorPoint = Vector2.new(0.5, 1)
-	panel.Position = UDim2.new(0.5, 0, 1, -20)
-	panel.Size = UDim2.fromOffset(440, 94)
-	panel.BackgroundColor3 = Color3.fromRGB(22, 23, 30)
-	panel.BorderSizePixel = 0
-	panel.Parent = gui
 
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 8)
-	corner.Parent = panel
-
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = Color3.fromRGB(78, 82, 108)
-	stroke.Transparency = 0.35
-	stroke.Thickness = 1
-	stroke.Parent = panel
-
-	local padding = Instance.new("UIPadding")
-	padding.PaddingTop = UDim.new(0, 10)
-	padding.PaddingBottom = UDim.new(0, 10)
-	padding.PaddingLeft = UDim.new(0, 10)
-	padding.PaddingRight = UDim.new(0, 10)
-	padding.Parent = panel
-
-	local field = Instance.new("TextBox")
+	local field = ui.input(panel, 0, "", "Paste bounds code here, or select bounds to export")
 	field.Name = "BoundsCode"
 	field.Size = UDim2.new(1, -42, 0, 46)
-	field.Position = UDim2.fromOffset(0, 0)
-	field.BackgroundColor3 = Color3.fromRGB(16, 17, 23)
-	field.BorderSizePixel = 0
-	field.ClearTextOnFocus = false
 	field.MultiLine = true
 	field.TextWrapped = true
 	field.TextXAlignment = Enum.TextXAlignment.Left
-	field.TextYAlignment = Enum.TextYAlignment.Center
 	field.Font = Enum.Font.Code
 	field.TextSize = 12
-	field.TextColor3 = Color3.fromRGB(230, 232, 240)
-	field.PlaceholderColor3 = Color3.fromRGB(140, 145, 168)
-	field.PlaceholderText = "Paste bounds code here, or select bounds to export"
-	field.Text = ""
-	field.TextEditable = true
-	field.Parent = panel
 	codeBox = field
 
-	local fieldCorner = Instance.new("UICorner")
-	fieldCorner.CornerRadius = UDim.new(0, 5)
-	fieldCorner.Parent = field
-
-	local clear = Instance.new("TextButton")
+	local clear = ui.button(panel, "×", 0)
 	clear.Name = "ClearHighlights"
 	clear.Size = UDim2.fromOffset(32, 46)
 	clear.Position = UDim2.new(1, -32, 0, 0)
-	clear.BackgroundColor3 = Color3.fromRGB(40, 42, 58)
-	clear.BorderSizePixel = 0
-	clear.Text = "×"
+	clear.BackgroundColor3 = ui.colors.panel
 	clear.Font = Enum.Font.Gotham
 	clear.TextSize = 22
-	clear.TextColor3 = Color3.fromRGB(230, 232, 240)
-	clear.Parent = panel
 
-	local clearCorner = Instance.new("UICorner")
-	clearCorner.CornerRadius = UDim.new(0, 5)
-	clearCorner.Parent = clear
-
-	local status = Instance.new("TextLabel")
+	local status = ui.label(panel, "Bounds ready", 0, ui.colors.sub)
 	status.Name = "Progress"
-	status.Size = UDim2.new(1, 0, 0, 20)
 	status.Position = UDim2.fromOffset(0, 54)
-	status.BackgroundTransparency = 1
-	status.Font = Enum.Font.Gotham
-	status.TextSize = 11
-	status.TextXAlignment = Enum.TextXAlignment.Left
-	status.TextColor3 = Color3.fromRGB(140, 145, 168)
-	status.Text = "Bounds ready"
-	status.Parent = panel
 	progressLabel = status
 
 	connectGui(clear.MouseButton1Click, function()

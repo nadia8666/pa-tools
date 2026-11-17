@@ -63,26 +63,20 @@ local paused = false
 local syncIgnored = false
 local playtestPaused = false
 
+local paTools = shared.paTools
+while not (paTools and paTools.ready and paTools.ui) do
+	task.wait()
+	paTools = shared.paTools
+end
+local ui = paTools.ui
+
 local widget = plugin:CreateDockWidgetPluginGuiAsync(
 	"pSync",
 	DockWidgetPluginGuiInfo.new(Enum.InitialDockState.Right, true, false, 320, 110, 240, 90)
 )
 widget.Title = "pSync"
 
-local COLORS = {
-	top = Color3.fromRGB(32, 34, 48),
-	bottom = Color3.fromRGB(16, 17, 23),
-	panel = Color3.fromRGB(40, 42, 58),
-	panelDark = Color3.fromRGB(22, 23, 32),
-	stroke = Color3.fromRGB(78, 82, 108),
-	text = Color3.fromRGB(230, 232, 240),
-	sub = Color3.fromRGB(140, 145, 168),
-	accent = Color3.fromRGB(88, 140, 255),
-	accentDark = Color3.fromRGB(58, 98, 210),
-	ok = Color3.fromRGB(80, 200, 120),
-	warn = Color3.fromRGB(235, 180, 60),
-	bad = Color3.fromRGB(235, 90, 90),
-}
+local COLORS = ui.colors
 local RED = Color3.fromRGB(235, 100, 100)
 local GREEN = Color3.fromRGB(110, 210, 140)
 local YELLOW = Color3.fromRGB(235, 200, 80)
@@ -95,163 +89,29 @@ local TAGS = {
 local STATE_COLORS = { added = GREEN, moved = YELLOW, deleted = RED }
 local STATE_PRIORITY = { added = 1, moved = 2, deleted = 3 }
 
-local function corner(parent, radius)
-	local c = Instance.new("UICorner")
-	c.CornerRadius = UDim.new(0, radius)
-	c.Parent = parent
-end
+local corner, stroke, pad, stack, escape = ui.corner, ui.stroke, ui.pad, ui.stack, ui.escape
 
-local function stroke(parent, color, transparency)
-	local s = Instance.new("UIStroke")
-	s.Color = color
-	s.Transparency = transparency
-	s.Thickness = 1
-	s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	s.Parent = parent
-end
-
-local function pad(parent, amount)
-	local p = Instance.new("UIPadding")
-	p.PaddingTop = UDim.new(0, amount)
-	p.PaddingBottom = UDim.new(0, amount)
-	p.PaddingLeft = UDim.new(0, amount)
-	p.PaddingRight = UDim.new(0, amount)
-	p.Parent = parent
-end
-
-local function stack(parent, spacing)
-	local l = Instance.new("UIListLayout")
-	l.SortOrder = Enum.SortOrder.LayoutOrder
-	l.Padding = UDim.new(0, spacing)
-	l.Parent = parent
-end
-
-local function escape(text)
-	return (string.gsub(string.gsub(string.gsub(text, "&", "&amp;"), "<", "&lt;"), ">", "&gt;"))
-end
-
-local root = Instance.new("Frame")
-root.Size = UDim2.fromScale(1, 1)
-root.BackgroundColor3 = Color3.new(0.098039, 0.101961, 0.105882)
-root.BorderSizePixel = 0
-root.Parent = widget
-
-local page = Instance.new("ScrollingFrame")
-page.Size = UDim2.fromScale(1, 1)
-page.BackgroundTransparency = 1
-page.BorderSizePixel = 0
-page.ScrollBarThickness = 4
-page.ScrollBarImageColor3 = COLORS.stroke
-page.AutomaticCanvasSize = Enum.AutomaticSize.Y
-page.CanvasSize = UDim2.new()
-page.Parent = root
-pad(page, 10)
-stack(page, 10)
+local root, page = ui.page(widget)
 
 local function makeCard(order)
-	local card = Instance.new("Frame")
-	card.Size = UDim2.new(1, 0, 0, 0)
-	card.AutomaticSize = Enum.AutomaticSize.Y
-	card.BackgroundColor3 = Color3.new(0.086275, 0.090196, 0.105882)
-	card.BackgroundTransparency = 0.2
-	card.BorderSizePixel = 0
-	card.LayoutOrder = order
-	card.Parent = page
-	corner(card, 10)
-	stroke(card, COLORS.stroke, 0.5)
-	pad(card, 10)
-	stack(card, 6)
-	return card
+	return ui.card(page, order)
 end
 
 local header = makeCard(1)
+local titleRow, title, dot = ui.titleRow(header, "pSync", 1)
+local status = ui.label(header, "Connecting...", 2, COLORS.sub)
 
-local titleRow = Instance.new("Frame")
-titleRow.Size = UDim2.new(1, 0, 0, 22)
-titleRow.BackgroundTransparency = 1
-titleRow.LayoutOrder = 1
-titleRow.Parent = header
-
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -20, 1, 0)
-title.BackgroundTransparency = 1
-title.Font = Enum.Font.GothamBold
-title.TextSize = 18
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.TextColor3 = COLORS.text
-title.Text = "pSync"
-title.Parent = titleRow
-
-local dot = Instance.new("Frame")
-dot.AnchorPoint = Vector2.new(1, 0.5)
-dot.Position = UDim2.new(1, 0, 0.5, 0)
-dot.Size = UDim2.fromOffset(10, 10)
-dot.BackgroundColor3 = COLORS.bad
-dot.BorderSizePixel = 0
-dot.Parent = titleRow
-corner(dot, 5)
-
-local status = Instance.new("TextLabel")
-status.Size = UDim2.new(1, 0, 0, 0)
-status.AutomaticSize = Enum.AutomaticSize.Y
-status.BackgroundTransparency = 1
-status.TextWrapped = true
-status.Font = Enum.Font.Gotham
-status.TextSize = 12
-status.TextXAlignment = Enum.TextXAlignment.Left
-status.TextYAlignment = Enum.TextYAlignment.Top
-status.TextColor3 = COLORS.sub
-status.Text = "Connecting..."
-status.LayoutOrder = 2
-status.Parent = header
-
-local resume = Instance.new("TextButton")
-resume.Size = UDim2.new(1, 0, 0, 32)
-resume.BackgroundColor3 = Color3.new(0.066667, 0.058824, 0.058824)
-resume.BorderSizePixel = 0
-resume.Font = Enum.Font.GothamBold
-resume.TextSize = 14
-resume.TextColor3 = Color3.new(1, 1, 1)
-resume.Text = "Resume"
-resume.Visible = false
-resume.LayoutOrder = 2
-resume.Parent = page
-corner(resume, 8)
-resume.MouseButton1Click:Connect(function()
+local resume = ui.button(page, "Resume", 2, function()
 	resumeRequested = true
 end)
+resume.Visible = false
 
 local function makeSection(title, order)
-	local card = makeCard(order)
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, 0, 0, 14)
-	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.GothamBold
-	label.TextSize = 11
-	label.TextXAlignment = Enum.TextXAlignment.Left
-	label.TextColor3 = COLORS.sub
-	label.Text = title
-	label.LayoutOrder = 0
-	label.Parent = card
-	return card
+	return (ui.section(page, title, order))
 end
 
 local function makeScroller(parent, height)
-	local scroller = Instance.new("ScrollingFrame")
-	scroller.Size = UDim2.new(1, 0, 0, height)
-	scroller.BackgroundColor3 = COLORS.panelDark
-	scroller.BackgroundTransparency = 0.4
-	scroller.BorderSizePixel = 0
-	scroller.ScrollBarThickness = 4
-	scroller.ScrollBarImageColor3 = COLORS.stroke
-	scroller.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	scroller.CanvasSize = UDim2.new()
-	scroller.LayoutOrder = 1
-	scroller.Parent = parent
-	corner(scroller, 8)
-	pad(scroller, 6)
-	stack(scroller, 4)
-	return scroller
+	return ui.scroller(parent, height, 1)
 end
 
 local changeFrame = makeScroller(makeSection("CHANGES", 3), 120)

@@ -7,26 +7,14 @@ if not RunService:IsEdit() then
 	return
 end
 
-local COLORS = {
-	top = Color3.fromRGB(32, 34, 48),
-	bottom = Color3.fromRGB(16, 17, 23),
-	panel = Color3.fromRGB(40, 42, 58),
-	panelDark = Color3.fromRGB(22, 23, 32),
-	stroke = Color3.fromRGB(78, 82, 108),
-	text = Color3.fromRGB(230, 232, 240),
-	sub = Color3.fromRGB(140, 145, 168),
-	accent = Color3.fromRGB(88, 140, 255),
-	accentDark = Color3.fromRGB(58, 98, 210),
-	ok = Color3.fromRGB(80, 200, 120),
-	warn = Color3.fromRGB(235, 180, 60),
-	bad = Color3.fromRGB(235, 90, 90),
-}
-
 local toolbar = shared.paTools
 while not (toolbar and toolbar.ready and type(toolbar.addButton) == "function") do
 	task.wait()
 	toolbar = shared.paTools
 end
+
+local ui = toolbar.ui
+local COLORS = ui.colors
 
 local widget = plugin:CreateDockWidgetPluginGuiAsync(
 	"edgeFill",
@@ -56,10 +44,11 @@ local deletingInwardTextures = false
 local inset = 0
 local width = 2
 local height = 2
-local CYLINDER_SIDES = 24
 local CYLINDER_ANGLES = {}
-for index = 0, CYLINDER_SIDES - 1 do
-	table.insert(CYLINDER_ANGLES, index / CYLINDER_SIDES * math.pi * 2)
+for quadrant = 0, 3 do
+	for _, slope in { 0, 1 / 3, 2 / 3, 1, 3 / 2, 3 } do
+		table.insert(CYLINDER_ANGLES, quadrant * math.pi / 2 + math.atan(slope))
+	end
 end
 
 local function connect(signal, callback)
@@ -68,103 +57,20 @@ local function connect(signal, callback)
 	return connection
 end
 
-local function create(className, properties, parent)
-	local instance = Instance.new(className)
-	for key, value in properties do
-		instance[key] = value
-	end
-	instance.Parent = parent
-	return instance
-end
+local _, scroller = ui.page(widget)
+local root = ui.card(scroller, 1)
 
-local page = create("Frame", {
-	Size = UDim2.fromScale(1, 1),
-	BackgroundColor3 = Color3.new(0.098039, 0.101961, 0.105882),
-	BorderSizePixel = 0,
-}, widget)
-local scroller = create("ScrollingFrame", {
-	Size = UDim2.fromScale(1, 1),
-	BackgroundTransparency = 1,
-	BorderSizePixel = 0,
-	CanvasSize = UDim2.new(),
-	AutomaticCanvasSize = Enum.AutomaticSize.Y,
-	ScrollingDirection = Enum.ScrollingDirection.Y,
-	ScrollBarThickness = 4,
-	ScrollBarImageColor3 = COLORS.stroke,
-}, page)
-create("UIPadding", {
-	PaddingTop = UDim.new(0, 10),
-	PaddingBottom = UDim.new(0, 10),
-	PaddingLeft = UDim.new(0, 10),
-	PaddingRight = UDim.new(0, 10),
-}, scroller)
-create("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder }, scroller)
-
-local root = create("Frame", {
-	Size = UDim2.new(1, 0, 0, 0),
-	AutomaticSize = Enum.AutomaticSize.Y,
-	BackgroundColor3 = Color3.new(0.086275, 0.090196, 0.105882),
-	BackgroundTransparency = 0.2,
-	BorderSizePixel = 0,
-	LayoutOrder = 1,
-}, scroller)
-create("UICorner", { CornerRadius = UDim.new(0, 10) }, root)
-create("UIStroke", { Color = COLORS.stroke, Thickness = 1, Transparency = 0.5 }, root)
-create("UIPadding", {
-	PaddingTop = UDim.new(0, 10),
-	PaddingBottom = UDim.new(0, 10),
-	PaddingLeft = UDim.new(0, 10),
-	PaddingRight = UDim.new(0, 10),
-}, root)
-create("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, root)
-
-local function makeLabel(text, heightValue, order, parent)
-	return create("TextLabel", {
-		Size = UDim2.new(1, 0, 0, heightValue),
-		BackgroundTransparency = 1,
-		Font = Enum.Font.Gotham,
-		TextSize = 13,
-		TextColor3 = COLORS.text,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextWrapped = true,
-		Text = text,
-		LayoutOrder = order,
-	}, parent or root)
+local function makeLabel(text, _height, order, parent)
+	return ui.label(parent or root, text, order)
 end
 
 local function makeButton(text, order, callback, parent)
-	local button = create("TextButton", {
-		Size = UDim2.new(1, 0, 0, 34),
-		BackgroundColor3 = COLORS.panel,
-		BorderSizePixel = 0,
-		Font = Enum.Font.GothamMedium,
-		TextSize = 13,
-		TextColor3 = COLORS.text,
-		Text = text,
-		LayoutOrder = order,
-	}, parent or root)
-	create("UICorner", { CornerRadius = UDim.new(0, 6) }, button)
-	create("UIStroke", { Color = COLORS.stroke, Thickness = 1, Transparency = 0.35 }, button)
-	button.Activated:Connect(callback)
-	return button
+	return ui.button(parent or root, text, order, callback)
 end
 
 local function makeInput(labelText, initialValue, order)
-	local label = makeLabel(labelText, 18, order)
-	local input = create("TextBox", {
-		Size = UDim2.new(1, 0, 0, 32),
-		BackgroundColor3 = COLORS.panelDark,
-		BorderSizePixel = 0,
-		Font = Enum.Font.Code,
-		TextSize = 14,
-		TextColor3 = COLORS.text,
-		PlaceholderColor3 = COLORS.sub,
-		Text = tostring(initialValue),
-		ClearTextOnFocus = false,
-		LayoutOrder = order + 1,
-	}, root)
-	create("UICorner", { CornerRadius = UDim.new(0, 6) }, input)
-	create("UIStroke", { Color = COLORS.stroke, Thickness = 1, Transparency = 0.65 }, input)
+	local label = ui.label(root, labelText, order, COLORS.sub)
+	local input = ui.input(root, order + 1, tostring(initialValue))
 	return input, label
 end
 
