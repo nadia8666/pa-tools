@@ -159,12 +159,12 @@ local function getParts(groupId)
 		end
 	end
 	for _, part in cached.targets do
-		if not table.find(targets, part) then
+		if not table.find(targets, part) and not table.find(cutters, part) then
 			untrackGroupPart(part)
 		end
 	end
 	for _, part in cached.cutters do
-		if not table.find(cutters, part) then
+		if not table.find(targets, part) and not table.find(cutters, part) then
 			untrackGroupPart(part)
 		end
 	end
