@@ -37,6 +37,11 @@ local placing = false
 local checking = false
 local lastValiditySignature
 local validityValid
+local groupCache = {}
+local partConnections = {}
+local validationGeneration = 0
+local validationPending = false
+local scheduledGroupId
 local clientFolder
 local surfaceHighlight
 local connections = {}
@@ -69,22 +74,79 @@ local function generateClientFolder()
 	return true
 end
 
-local function getParts(groupId)
-	local targets = {}
-	local cutters = {}
-	local camera = getCamera()
-	for _, instance in workspace:GetDescendants() do
-		if instance:IsA("BasePart") and instance:GetAttribute(GROUP_ATTRIBUTE) == groupId then
-			if instance:GetAttribute(CUTTER_ATTRIBUTE) == true and camera and instance:IsDescendantOf(camera) then
-				table.insert(cutters, instance)
-			elseif
-				instance:GetAttribute(CUTTER_ATTRIBUTE) ~= true and (not camera or not instance:IsDescendantOf(camera))
-			then
-				table.insert(targets, instance)
+local scheduleValidation
+
+local function trackGroupPart(groupId, part)
+	if partConnections[part] then
+		return
+	end
+	local function changed()
+		local cached = groupCache[groupId]
+		if cached then
+			local targets = cached.targets
+			local cutters = cached.cutters
+			local targetIndex = table.find(targets, part)
+			local cutterIndex = table.find(cutters, part)
+			if targetIndex then
+				table.remove(targets, targetIndex)
+			end
+			if cutterIndex then
+				table.remove(cutters, cutterIndex)
+			end
+			if part:IsDescendantOf(workspace) and part:GetAttribute(GROUP_ATTRIBUTE) == groupId then
+				local camera = getCamera()
+				if part:GetAttribute(CUTTER_ATTRIBUTE) == true and camera and part:IsDescendantOf(camera) then
+					table.insert(cutters, part)
+				elseif part:GetAttribute(CUTTER_ATTRIBUTE) ~= true and (not camera or not part:IsDescendantOf(camera)) then
+					table.insert(targets, part)
+				end
 			end
 		end
+		lastValiditySignature = nil
+		validityValid = nil
+		if scheduleValidation then
+			scheduleValidation(groupId)
+		end
 	end
-	return targets, cutters
+	partConnections[part] = {
+		part:GetPropertyChangedSignal("CFrame"):Connect(changed),
+		part:GetPropertyChangedSignal("Size"):Connect(changed),
+		part.AncestryChanged:Connect(changed),
+	}
+end
+
+local function untrackGroupPart(part)
+	local connectionsForPart = partConnections[part]
+	if not connectionsForPart then
+		return
+	end
+	for _, connection in connectionsForPart do
+		connection:Disconnect()
+	end
+	partConnections[part] = nil
+end
+
+local function getParts(groupId)
+	local cached = groupCache[groupId]
+	if not cached then
+		cached = { targets = {}, cutters = {} }
+		local camera = getCamera()
+		for _, instance in workspace:GetDescendants() do
+			if instance:IsA("BasePart") and instance:GetAttribute(GROUP_ATTRIBUTE) == groupId then
+				if instance:GetAttribute(CUTTER_ATTRIBUTE) == true and camera and instance:IsDescendantOf(camera) then
+					table.insert(cached.cutters, instance)
+				elseif
+					instance:GetAttribute(CUTTER_ATTRIBUTE) ~= true
+					and (not camera or not instance:IsDescendantOf(camera))
+				then
+					table.insert(cached.targets, instance)
+				end
+				trackGroupPart(groupId, instance)
+			end
+		end
+		groupCache[groupId] = cached
+	end
+	return cached.targets, cached.cutters
 end
 
 local function getGroupFromSelection()
@@ -99,6 +161,63 @@ local function getGroupFromSelection()
 	return nil
 end
 
+local function clearGroupHighlights()
+	if not clientFolder then
+		return
+	end
+	for _, instance in clientFolder:GetChildren() do
+		if instance:IsA("Highlight") and instance.Name == "GroupHighlight" then
+			instance:Destroy()
+		end
+	end
+end
+
+local function refreshGroupHighlights(groupId)
+	if not generateClientFolder() then
+		return
+	end
+	clearGroupHighlights()
+	if not groupId then
+		return
+	end
+	local targets = getParts(groupId)
+	for _, target in targets do
+		local highlight = Instance.new("Highlight")
+		highlight.Name = "GroupHighlight"
+		highlight.Adornee = target
+		highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+		highlight.FillColor = Color3.fromRGB(65, 135, 255)
+		highlight.FillTransparency = 0.82
+		highlight.OutlineColor = Color3.fromRGB(65, 135, 255)
+		highlight.OutlineTransparency = 0.1
+		highlight.Archivable = false
+		highlight.Parent = clientFolder
+	end
+end
+
+local function endCut(groupId)
+	if not groupId then
+		return
+	end
+	local targets, cutters = getParts(groupId)
+	for _, instance in targets do
+		instance:SetAttribute(GROUP_ATTRIBUTE, nil)
+		instance:SetAttribute(CUTTER_ATTRIBUTE, nil)
+		untrackGroupPart(instance)
+	end
+	for _, cutter in cutters do
+		untrackGroupPart(cutter)
+		cutter:Destroy()
+	end
+	groupCache[groupId] = nil
+	if groupId == currentGroupId then
+		currentGroupId = nil
+		lastValiditySignature = nil
+		validityValid = nil
+		clearGroupHighlights()
+	end
+end
+
 local function markCuttable()
 	local selected = {}
 	local camera = getCamera()
@@ -107,22 +226,42 @@ local function markCuttable()
 			table.insert(selected, instance)
 		end
 	end
-	if #selected == 0 then
-		warn("Select one or more BaseParts to mark as cuttable.")
-		return
+	local previousGroupIds = {}
+	local function addPreviousGroup(groupId)
+		if groupId and not table.find(previousGroupIds, groupId) then
+			table.insert(previousGroupIds, groupId)
+		end
 	end
-	local groupId = HttpService:GenerateGUID(false)
+	addPreviousGroup(currentGroupId)
+	for _, instance in Selection:Get() do
+		if instance:IsA("BasePart") then
+			addPreviousGroup(instance:GetAttribute(GROUP_ATTRIBUTE))
+		end
+	end
 	local recording = ChangeHistoryService:TryBeginRecording("HoleCutter_MarkGroup", "Mark Cuttable")
 	if not recording then
 		return
 	end
+	for _, groupId in previousGroupIds do
+		endCut(groupId)
+	end
+	if #selected == 0 then
+		ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
+		return
+	end
+	local groupId = HttpService:GenerateGUID(false)
+	groupCache[groupId] = { targets = selected, cutters = {} }
 	for _, part in selected do
+		untrackGroupPart(part)
 		part:SetAttribute(GROUP_ATTRIBUTE, groupId)
 		part:SetAttribute(CUTTER_ATTRIBUTE, nil)
+		trackGroupPart(groupId, part)
 	end
 	ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
 	currentGroupId = groupId
 	lastValiditySignature = nil
+	validityValid = nil
+	refreshGroupHighlights(groupId)
 end
 
 local function cloneAppearance(instance)
@@ -229,8 +368,140 @@ local function destroyParts(parts)
 	end
 end
 
+local function isAxisAligned(cframe)
+	local right = cframe.RightVector
+	local up = cframe.UpVector
+	local look = cframe.LookVector
+	local threshold = 0.999999
+	local function aligned(vector)
+		return math.max(math.abs(vector.X), math.abs(vector.Y), math.abs(vector.Z)) > threshold
+	end
+	return aligned(right) and aligned(up) and aligned(look)
+end
+
+local function isAlignedTo(target, part)
+	local relative = target.CFrame:ToObjectSpace(part.CFrame)
+	local function aligned(vector)
+		return math.max(math.abs(vector.X), math.abs(vector.Y), math.abs(vector.Z)) > 0.999999
+	end
+	return isAxisAligned(target.CFrame) and isAxisAligned(part.CFrame)
+		and aligned(relative.RightVector) and aligned(relative.UpVector) and aligned(relative.LookVector)
+end
+
+local function canSplitManually(target, cutters)
+	if not target:IsA("Part") or target.Shape ~= Enum.PartType.Block then
+		return false
+	end
+	for _, cutter in cutters do
+		if not cutter:IsA("Part") or cutter.Shape ~= Enum.PartType.Block or not isAlignedTo(target, cutter) then
+			return false
+		end
+	end
+	return true
+end
+
+local function needsCutterUnion(cutters)
+	for _, cutter in cutters do
+		if not cutter:IsA("Part") or cutter.Shape ~= Enum.PartType.Block or not isAxisAligned(cutter.CFrame) then
+			return true
+		end
+	end
+	return false
+end
+
+local function splitTarget(target, cutters)
+	local half = target.Size / 2
+	local pieces = {
+		{ min = -half, max = half },
+	}
+	local epsilon = 0.0001
+	for _, cutter in cutters do
+		local relative = target.CFrame:ToObjectSpace(cutter.CFrame)
+		local right = relative.RightVector * (cutter.Size.X / 2)
+		local up = relative.UpVector * (cutter.Size.Y / 2)
+		local look = relative.LookVector * (cutter.Size.Z / 2)
+		local cutterHalf = Vector3.new(
+			math.abs(right.X) + math.abs(up.X) + math.abs(look.X),
+			math.abs(right.Y) + math.abs(up.Y) + math.abs(look.Y),
+			math.abs(right.Z) + math.abs(up.Z) + math.abs(look.Z)
+		)
+		local cutterMin = relative.Position - cutterHalf
+		local cutterMax = relative.Position + cutterHalf
+		local nextPieces = {}
+		for _, piece in pieces do
+			local min = Vector3.new(
+				math.max(piece.min.X, cutterMin.X),
+				math.max(piece.min.Y, cutterMin.Y),
+				math.max(piece.min.Z, cutterMin.Z)
+			)
+			local max = Vector3.new(
+				math.min(piece.max.X, cutterMax.X),
+				math.min(piece.max.Y, cutterMax.Y),
+				math.min(piece.max.Z, cutterMax.Z)
+			)
+			if min.X >= max.X - epsilon or min.Y >= max.Y - epsilon or min.Z >= max.Z - epsilon then
+				table.insert(nextPieces, piece)
+				continue
+			end
+			local function addPiece(pieceMin, pieceMax)
+				if pieceMax.X - pieceMin.X > epsilon and pieceMax.Y - pieceMin.Y > epsilon and pieceMax.Z - pieceMin.Z > epsilon then
+					table.insert(nextPieces, { min = pieceMin, max = pieceMax })
+				end
+			end
+			addPiece(piece.min, Vector3.new(min.X, piece.max.Y, piece.max.Z))
+			addPiece(Vector3.new(max.X, piece.min.Y, piece.min.Z), piece.max)
+			addPiece(Vector3.new(min.X, piece.min.Y, piece.min.Z), Vector3.new(max.X, min.Y, piece.max.Z))
+			addPiece(Vector3.new(min.X, max.Y, piece.min.Z), Vector3.new(max.X, piece.max.Y, piece.max.Z))
+			addPiece(Vector3.new(min.X, min.Y, piece.min.Z), Vector3.new(max.X, max.Y, min.Z))
+			addPiece(Vector3.new(min.X, min.Y, max.Z), Vector3.new(max.X, max.Y, piece.max.Z))
+		end
+		pieces = nextPieces
+		if #pieces == 0 then
+			break
+		end
+	end
+	local results = {}
+	for _, piece in pieces do
+		local result = Instance.new("Part")
+		result.Archivable = true
+		result.Size = piece.max - piece.min
+		result.CFrame = target.CFrame * CFrame.new((piece.min + piece.max) / 2)
+		copyProperties(target, result)
+		result.Name = target.Name
+		table.insert(results, result)
+	end
+	if #results == 0 then
+		error("the cutters removed the entire target")
+	end
+	return results
+end
+
 local function subtract(target, cutters)
-	local results = GeometryService:SubtractAsync(target, cutters)
+	if canSplitManually(target, cutters) then
+		return splitTarget(target, cutters)
+	end
+	local unionResults
+	local subtractionCutters = cutters
+	if #cutters > 1 and needsCutterUnion(cutters) then
+		local remainingCutters = table.create(#cutters - 1)
+		for index = 2, #cutters do
+			table.insert(remainingCutters, cutters[index])
+		end
+		unionResults = GeometryService:UnionAsync(cutters[1], remainingCutters)
+		if type(unionResults) ~= "table" or #unionResults == 0 then
+			error("the cutter arrangement could not be unioned")
+		end
+		subtractionCutters = unionResults
+	end
+	local ok, results = pcall(function()
+		return GeometryService:SubtractAsync(target, subtractionCutters)
+	end)
+	if unionResults then
+		destroyParts(unionResults)
+	end
+	if not ok then
+		error(results)
+	end
 	if type(results) ~= "table" or #results == 0 then
 		error("the cutter arrangement produced no geometry")
 	end
@@ -306,6 +577,28 @@ local function validateGroup(groupId, force)
 		warn("Hole cutter validation failed: " .. tostring(err))
 	end
 	return ok and unchanged
+end
+
+scheduleValidation = function(groupId)
+	scheduledGroupId = groupId
+	validationGeneration += 1
+	if validationPending then
+		return
+	end
+	validationPending = true
+	task.spawn(function()
+		local generation
+		repeat
+			generation = validationGeneration
+			task.wait(0.2)
+		until generation == validationGeneration
+		local validationGroupId = scheduledGroupId
+		validationPending = false
+		if checking or validationGroupId ~= currentGroupId then
+			return
+		end
+		validateGroup(validationGroupId, false)
+	end)
 end
 
 local function captureStates(parts)
@@ -524,10 +817,13 @@ local function applyCuts()
 		return
 	end
 
+	for _, output in outputs do
+		output:SetAttribute(GROUP_ATTRIBUTE, nil)
+		output:SetAttribute(CUTTER_ATTRIBUTE, nil)
+	end
+	endCut(groupId)
 	ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
 	Selection:Set(outputs)
-	lastValiditySignature = nil
-	validityValid = nil
 end
 
 local function normalId(part, worldNormal)
@@ -566,9 +862,13 @@ local function createCutter(hitPosition, hitNormal)
 	cutter:SetAttribute(GROUP_ATTRIBUTE, currentGroupId)
 	cutter:SetAttribute(CUTTER_ATTRIBUTE, true)
 	cutter.Parent = clientFolder
+	local _, cutters = getParts(currentGroupId)
+	table.insert(cutters, cutter)
+	trackGroupPart(currentGroupId, cutter)
 	ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
 	Selection:Set({ cutter })
 	lastValiditySignature = nil
+	scheduleValidation(currentGroupId)
 end
 
 local function beginPlacement()
@@ -787,32 +1087,16 @@ reloadButtons()
 
 Selection.SelectionChanged:Connect(function()
 	local selectedGroup = getGroupFromSelection()
-	if selectedGroup ~= currentGroupId then
+	if selectedGroup and selectedGroup ~= currentGroupId then
 		currentGroupId = selectedGroup
 		lastValiditySignature = nil
 		validityValid = nil
-		if not currentGroupId then
-			local camera = getCamera()
-			if camera then
-				for _, instance in camera:GetDescendants() do
-					if instance:IsA("BasePart") and instance:GetAttribute(CUTTER_ATTRIBUTE) == true then
-						instance.Color = DEFAULT_COLOR
-					end
-				end
-			end
-		end
+		refreshGroupHighlights(currentGroupId)
+		scheduleValidation(currentGroupId)
 	end
 end)
 
-task.spawn(function()
-	while true do
-		task.wait(1)
-		local groupId = currentGroupId or getGroupFromSelection()
-		if groupId then
-			validateGroup(groupId, false)
-		end
-	end
-end)
+
 
 plugin.Unloading:Connect(function()
 	toolbarCallbacks.holeCutter = nil
@@ -825,6 +1109,11 @@ plugin.Unloading:Connect(function()
 		connection:Disconnect()
 	end
 	table.clear(connections)
+	clearGroupHighlights()
+	for part in partConnections do
+		untrackGroupPart(part)
+	end
+	table.clear(groupCache)
 	if surfaceHighlight then
 		surfaceHighlight.Adornee = nil
 		surfaceHighlight:Destroy()
