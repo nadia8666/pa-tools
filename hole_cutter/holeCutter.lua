@@ -106,6 +106,7 @@ local function generateClientFolder()
 end
 
 local scheduleValidation
+local untrackGroupPart
 
 local function trackGroupPart(groupId, part)
 	if partConnections[part] then
@@ -151,7 +152,7 @@ local function trackGroupPart(groupId, part)
 	}
 end
 
-local function untrackGroupPart(part)
+untrackGroupPart = function(part)
 	local connectionsForPart = partConnections[part]
 	if not connectionsForPart then
 		return
@@ -251,6 +252,8 @@ local function endCut(groupId)
 	for _, instance in targets do
 		CollectionService:RemoveTag(instance, getGroupTag(groupId))
 		CollectionService:RemoveTag(instance, CUTTER_TAG)
+		instance:SetAttribute(LEGACY_GROUP_ATTRIBUTE, nil)
+		instance:SetAttribute(LEGACY_CUTTER_ATTRIBUTE, nil)
 		untrackGroupPart(instance)
 	end
 	for _, cutter in cutters do
@@ -897,6 +900,8 @@ local function applyCuts()
 			CollectionService:RemoveTag(output, getGroupTag(outputGroupId))
 		end
 		CollectionService:RemoveTag(output, CUTTER_TAG)
+		output:SetAttribute(LEGACY_GROUP_ATTRIBUTE, nil)
+		output:SetAttribute(LEGACY_CUTTER_ATTRIBUTE, nil)
 	end
 	endCut(groupId)
 	ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
@@ -1185,6 +1190,7 @@ local function invalidateGroupCache()
 		untrackGroupPart(part)
 	end
 	table.clear(groupCache)
+	table.clear(migratedLegacyGroups)
 	currentGroupId = getGroupFromSelection()
 	lastValiditySignature = nil
 	validityValid = nil
@@ -1194,8 +1200,8 @@ local function invalidateGroupCache()
 	end
 end
 
-ChangeHistoryService.OnUndo:Connect(invalidateGroupCache)
-ChangeHistoryService.OnRedo:Connect(invalidateGroupCache)
+table.insert(connections, ChangeHistoryService.OnUndo:Connect(invalidateGroupCache))
+table.insert(connections, ChangeHistoryService.OnRedo:Connect(invalidateGroupCache))
 
 plugin.Unloading:Connect(function()
 	toolbarCallbacks.holeCutter = nil
