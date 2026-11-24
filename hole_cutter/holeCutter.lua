@@ -41,6 +41,7 @@ local lastValiditySignature
 local validityValid
 local groupCache = {}
 local partConnections = {}
+local legacyGroupIds = {}
 local migratedLegacyGroups = {}
 local validationGeneration = 0
 local validationPending = false
@@ -59,11 +60,15 @@ local function getGroupId(instance)
 			return string.sub(tag, #GROUP_TAG_PREFIX + 1)
 		end
 	end
-	return instance:GetAttribute(LEGACY_GROUP_ATTRIBUTE)
+	local legacyGroupId = instance:GetAttribute(LEGACY_GROUP_ATTRIBUTE)
+	if legacyGroupId then
+		legacyGroupIds[legacyGroupId] = true
+	end
+	return legacyGroupId
 end
 
 local function migrateLegacyGroup(groupId)
-	if migratedLegacyGroups[groupId] then
+	if not legacyGroupIds[groupId] or migratedLegacyGroups[groupId] then
 		return
 	end
 	migratedLegacyGroups[groupId] = true
@@ -1193,6 +1198,7 @@ local function invalidateGroupCache()
 		untrackGroupPart(part)
 	end
 	table.clear(groupCache)
+	table.clear(legacyGroupIds)
 	table.clear(migratedLegacyGroups)
 	currentGroupId = getGroupFromSelection()
 	lastValiditySignature = nil
