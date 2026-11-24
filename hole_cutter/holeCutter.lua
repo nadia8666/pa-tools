@@ -144,12 +144,15 @@ local function trackGroupPart(groupId, part)
 			scheduleValidation(groupId)
 		end
 	end
-	partConnections[part] = {
+	local partSignals = {
 		part:GetPropertyChangedSignal("CFrame"):Connect(changed),
 		part:GetPropertyChangedSignal("Size"):Connect(changed),
-		part:GetPropertyChangedSignal("Shape"):Connect(changed),
 		part.AncestryChanged:Connect(changed),
 	}
+	if part:IsA("Part") then
+		table.insert(partSignals, part:GetPropertyChangedSignal("Shape"):Connect(changed))
+	end
+	partConnections[part] = partSignals
 end
 
 untrackGroupPart = function(part)
