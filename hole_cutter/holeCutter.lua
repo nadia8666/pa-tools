@@ -481,25 +481,9 @@ local function subtract(target, cutters)
 	if canSplitManually(target, cutters) then
 		return splitTarget(target, cutters)
 	end
-	local unionResults
-	local subtractionCutters = cutters
-	if #cutters > 1 then
-		local remainingCutters = table.create(#cutters - 1)
-		for index = 2, #cutters do
-			table.insert(remainingCutters, cutters[index])
-		end
-		unionResults = GeometryService:UnionAsync(cutters[1], remainingCutters)
-		if type(unionResults) ~= "table" or #unionResults == 0 then
-			error("the cutter arrangement could not be unioned")
-		end
-		subtractionCutters = unionResults
-	end
 	local ok, results = pcall(function()
-		return GeometryService:SubtractAsync(target, subtractionCutters)
+		return GeometryService:SubtractAsync(target, cutters)
 	end)
-	if unionResults then
-		destroyParts(unionResults)
-	end
 	if not ok then
 		error(results)
 	end
