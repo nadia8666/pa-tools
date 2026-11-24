@@ -143,20 +143,34 @@ local function getParts(groupId)
 	local cached = groupCache[groupId]
 	if not cached then
 		cached = { targets = {}, cutters = {} }
-		local camera = getCamera()
-		for _, instance in CollectionService:GetTagged(getGroupTag(groupId)) do
-			if instance:IsA("BasePart") and instance:IsDescendantOf(workspace) then
-				if CollectionService:HasTag(instance, CUTTER_TAG) and camera and instance:IsDescendantOf(camera) then
-					table.insert(cached.cutters, instance)
-				elseif not CollectionService:HasTag(instance, CUTTER_TAG) and (not camera or not instance:IsDescendantOf(camera)) then
-					table.insert(cached.targets, instance)
-				end
-				trackGroupPart(groupId, instance)
-			end
-		end
 		groupCache[groupId] = cached
 	end
-	return cached.targets, cached.cutters
+	local targets = {}
+	local cutters = {}
+	local camera = getCamera()
+	for _, instance in CollectionService:GetTagged(getGroupTag(groupId)) do
+		if instance:IsA("BasePart") and instance:IsDescendantOf(workspace) then
+			if CollectionService:HasTag(instance, CUTTER_TAG) and camera and instance:IsDescendantOf(camera) then
+				table.insert(cutters, instance)
+			elseif not CollectionService:HasTag(instance, CUTTER_TAG) and (not camera or not instance:IsDescendantOf(camera)) then
+				table.insert(targets, instance)
+			end
+			trackGroupPart(groupId, instance)
+		end
+	end
+	for _, part in cached.targets do
+		if not table.find(targets, part) then
+			untrackGroupPart(part)
+		end
+	end
+	for _, part in cached.cutters do
+		if not table.find(cutters, part) then
+			untrackGroupPart(part)
+		end
+	end
+	cached.targets = targets
+	cached.cutters = cutters
+	return targets, cutters
 end
 
 local function getGroupFromSelection()
