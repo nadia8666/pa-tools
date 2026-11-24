@@ -410,15 +410,6 @@ local function canSplitManually(target, cutters)
 	return true
 end
 
-local function needsCutterUnion(cutters)
-	for _, cutter in cutters do
-		if not cutter:IsA("Part") or cutter.Shape ~= Enum.PartType.Block or not isAxisAligned(cutter.CFrame) then
-			return true
-		end
-	end
-	return false
-end
-
 local function splitTarget(target, cutters)
 	local half = target.Size / 2
 	local pieces = {
@@ -492,7 +483,7 @@ local function subtract(target, cutters)
 	end
 	local unionResults
 	local subtractionCutters = cutters
-	if #cutters > 1 and needsCutterUnion(cutters) then
+	if #cutters > 1 then
 		local remainingCutters = table.create(#cutters - 1)
 		for index = 2, #cutters do
 			table.insert(remainingCutters, cutters[index])
