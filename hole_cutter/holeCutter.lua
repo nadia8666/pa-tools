@@ -867,7 +867,9 @@ local function createCutter(hitPosition, hitNormal)
 	CollectionService:AddTag(cutter, getGroupTag(currentGroupId))
 	CollectionService:AddTag(cutter, CUTTER_TAG)
 	local _, cutters = getParts(currentGroupId)
-	table.insert(cutters, cutter)
+	if not table.find(cutters, cutter) then
+		table.insert(cutters, cutter)
+	end
 	trackGroupPart(currentGroupId, cutter)
 	ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
 	Selection:Set({ cutter })
@@ -1027,6 +1029,14 @@ local function MergeSelectedParts()
 			newPart.CFrame = bestUnionCFrame
 			newPart.Parent = p1.Parent
 			CopyProperties(p1, newPart)
+			local groupId = getGroupId(newPart)
+			if groupId then
+				local cached = groupCache[groupId]
+				if cached and not table.find(cached.targets, newPart) then
+					table.insert(cached.targets, newPart)
+				end
+				trackGroupPart(groupId, newPart)
+			end
 			for _, child in ipairs(p2:GetChildren()) do
 				if child:IsA("Texture") or child:IsA("Decal") then
 					local clone = cloneAppearance(child)
