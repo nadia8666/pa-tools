@@ -11,6 +11,8 @@ end
 
 local GROUP_TAG_PREFIX = "HoleCutterGroup_"
 local CUTTER_TAG = "HoleCutterCutter"
+local LEGACY_GROUP_ATTRIBUTE = "HoleCutterGroupId"
+local LEGACY_CUTTER_ATTRIBUTE = "HoleCutterIsCutter"
 local CUTTER_NAME = "HoleCutter"
 local DEFAULT_CUTTER_SIZE = Vector3.new(2, 2, 2)
 local DEFAULT_COLOR = Color3.fromRGB(65, 135, 255)
@@ -39,6 +41,7 @@ local lastValiditySignature
 local validityValid
 local groupCache = {}
 local partConnections = {}
+local migratedLegacyGroups = {}
 local validationGeneration = 0
 local validationPending = false
 local scheduledGroupId
@@ -56,7 +59,22 @@ local function getGroupId(instance)
 			return string.sub(tag, #GROUP_TAG_PREFIX + 1)
 		end
 	end
-	return nil
+	return instance:GetAttribute(LEGACY_GROUP_ATTRIBUTE)
+end
+
+local function migrateLegacyGroup(groupId)
+	if migratedLegacyGroups[groupId] then
+		return
+	end
+	migratedLegacyGroups[groupId] = true
+	for _, instance in workspace:GetDescendants() do
+		if instance:IsA("BasePart") and instance:GetAttribute(LEGACY_GROUP_ATTRIBUTE) == groupId then
+			CollectionService:AddTag(instance, getGroupTag(groupId))
+			if instance:GetAttribute(LEGACY_CUTTER_ATTRIBUTE) == true then
+				CollectionService:AddTag(instance, CUTTER_TAG)
+			end
+		end
+	end
 end
 
 local function getCamera()
@@ -95,6 +113,7 @@ local function trackGroupPart(groupId, part)
 	end
 	local function changed()
 		local cached = groupCache[groupId]
+		local isMember = part:IsDescendantOf(workspace) and CollectionService:HasTag(part, getGroupTag(groupId))
 		if cached then
 			local targets = cached.targets
 			local cutters = cached.cutters
@@ -106,7 +125,7 @@ local function trackGroupPart(groupId, part)
 			if cutterIndex then
 				table.remove(cutters, cutterIndex)
 			end
-			if part:IsDescendantOf(workspace) and CollectionService:HasTag(part, getGroupTag(groupId)) then
+			if isMember then
 				local camera = getCamera()
 				if CollectionService:HasTag(part, CUTTER_TAG) and camera and part:IsDescendantOf(camera) then
 					table.insert(cutters, part)
@@ -114,6 +133,9 @@ local function trackGroupPart(groupId, part)
 					table.insert(targets, part)
 				end
 			end
+		end
+		if not isMember then
+			untrackGroupPart(part)
 		end
 		lastValiditySignature = nil
 		validityValid = nil
@@ -124,6 +146,7 @@ local function trackGroupPart(groupId, part)
 	partConnections[part] = {
 		part:GetPropertyChangedSignal("CFrame"):Connect(changed),
 		part:GetPropertyChangedSignal("Size"):Connect(changed),
+		part:GetPropertyChangedSignal("Shape"):Connect(changed),
 		part.AncestryChanged:Connect(changed),
 	}
 end
@@ -140,6 +163,7 @@ local function untrackGroupPart(part)
 end
 
 local function getParts(groupId)
+	migrateLegacyGroup(groupId)
 	local cached = groupCache[groupId]
 	if not cached then
 		cached = { targets = {}, cutters = {} }
@@ -244,23 +268,20 @@ end
 
 local function markCuttable()
 	local selected = {}
+	local previousGroupIds = {}
 	local camera = getCamera()
 	for _, instance in Selection:Get() do
 		if instance:IsA("BasePart") and (not camera or not instance:IsDescendantOf(camera)) then
 			table.insert(selected, instance)
+			local groupId = getGroupId(instance)
+			if groupId and not table.find(previousGroupIds, groupId) then
+				table.insert(previousGroupIds, groupId)
+			end
 		end
 	end
-	local previousGroupIds = {}
-	local function addPreviousGroup(groupId)
-		if groupId and not table.find(previousGroupIds, groupId) then
-			table.insert(previousGroupIds, groupId)
-		end
-	end
-	addPreviousGroup(currentGroupId)
-	for _, instance in Selection:Get() do
-		if instance:IsA("BasePart") then
-			addPreviousGroup(getGroupId(instance))
-		end
+	if #selected == 0 then
+		warn("Select one or more BaseParts to mark as cuttable.")
+		return
 	end
 	local recording = ChangeHistoryService:TryBeginRecording("HoleCutter_MarkGroup", "Mark Cuttable")
 	if not recording then
@@ -268,10 +289,6 @@ local function markCuttable()
 	end
 	for _, groupId in previousGroupIds do
 		endCut(groupId)
-	end
-	if #selected == 0 then
-		ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
-		return
 	end
 	local groupId = HttpService:GenerateGUID(false)
 	groupCache[groupId] = { targets = selected, cutters = {} }
@@ -424,7 +441,52 @@ local function canSplitManually(target, cutters)
 	return true
 end
 
+local function intersects(first, second)
+	local firstAxes = { first.CFrame.RightVector, first.CFrame.UpVector, first.CFrame.LookVector }
+	local secondAxes = { second.CFrame.RightVector, second.CFrame.UpVector, second.CFrame.LookVector }
+	local firstHalf = first.Size / 2
+	local secondHalf = second.Size / 2
+	local offset = second.Position - first.Position
+	local axes = {}
+	for _, axis in firstAxes do
+		table.insert(axes, axis)
+	end
+	for _, axis in secondAxes do
+		table.insert(axes, axis)
+	end
+	for _, firstAxis in firstAxes do
+		for _, secondAxis in secondAxes do
+			local axis = firstAxis:Cross(secondAxis)
+			if axis.Magnitude > 0.000001 then
+				table.insert(axes, axis.Unit)
+			end
+		end
+	end
+	for _, axis in axes do
+		local firstRadius = firstHalf.X * math.abs(axis:Dot(firstAxes[1]))
+			+ firstHalf.Y * math.abs(axis:Dot(firstAxes[2]))
+			+ firstHalf.Z * math.abs(axis:Dot(firstAxes[3]))
+		local secondRadius = secondHalf.X * math.abs(axis:Dot(secondAxes[1]))
+			+ secondHalf.Y * math.abs(axis:Dot(secondAxes[2]))
+			+ secondHalf.Z * math.abs(axis:Dot(secondAxes[3]))
+		if math.abs(offset:Dot(axis)) >= firstRadius + secondRadius - 0.0001 then
+			return false
+		end
+	end
+	return true
+end
+
 local function splitTarget(target, cutters)
+	local intersectsTarget = false
+	for _, cutter in cutters do
+		if intersects(target, cutter) then
+			intersectsTarget = true
+			break
+		end
+	end
+	if not intersectsTarget then
+		error("the cutters do not intersect the target")
+	end
 	local half = target.Size / 2
 	local pieces = {
 		{ min = -half, max = half },
@@ -475,6 +537,9 @@ local function splitTarget(target, cutters)
 			break
 		end
 	end
+	if #pieces == 1 and pieces[1].min == -half and pieces[1].max == half then
+		error("the cutters do not remove any geometry from the target")
+	end
 	local results = {}
 	for _, piece in pieces do
 		local result = Instance.new("Part")
@@ -492,6 +557,16 @@ local function splitTarget(target, cutters)
 end
 
 local function subtract(target, cutters)
+	local intersectsTarget = false
+	for _, cutter in cutters do
+		if intersects(target, cutter) then
+			intersectsTarget = true
+			break
+		end
+	end
+	if not intersectsTarget then
+		error("the cutters do not intersect the target")
+	end
 	if canSplitManually(target, cutters) then
 		return splitTarget(target, cutters)
 	end
@@ -1029,10 +1104,7 @@ local function MergeSelectedParts()
 			CopyProperties(p1, newPart)
 			local groupId = getGroupId(newPart)
 			if groupId then
-				local cached = groupCache[groupId]
-				if cached and not table.find(cached.targets, newPart) then
-					table.insert(cached.targets, newPart)
-				end
+				groupCache[groupId] = nil
 				trackGroupPart(groupId, newPart)
 			end
 			for _, child in ipairs(p2:GetChildren()) do
@@ -1108,7 +1180,22 @@ Selection.SelectionChanged:Connect(function()
 	end
 end)
 
+local function invalidateGroupCache()
+	for part in partConnections do
+		untrackGroupPart(part)
+	end
+	table.clear(groupCache)
+	currentGroupId = getGroupFromSelection()
+	lastValiditySignature = nil
+	validityValid = nil
+	refreshGroupHighlights(currentGroupId)
+	if currentGroupId then
+		scheduleValidation(currentGroupId)
+	end
+end
 
+ChangeHistoryService.OnUndo:Connect(invalidateGroupCache)
+ChangeHistoryService.OnRedo:Connect(invalidateGroupCache)
 
 plugin.Unloading:Connect(function()
 	toolbarCallbacks.holeCutter = nil
