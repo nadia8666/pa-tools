@@ -9,8 +9,8 @@ if not RunService:IsEdit() then
 	return
 end
 
-local GROUP_ATTRIBUTE = "HoleCutterGroupId"
-local CUTTER_ATTRIBUTE = "HoleCutterIsCutter"
+local GROUP_TAG_PREFIX = "HoleCutterGroup_"
+local CUTTER_TAG = "HoleCutterCutter"
 local CUTTER_NAME = "HoleCutter"
 local DEFAULT_CUTTER_SIZE = Vector3.new(2, 2, 2)
 local DEFAULT_COLOR = Color3.fromRGB(65, 135, 255)
@@ -45,6 +45,19 @@ local scheduledGroupId
 local clientFolder
 local surfaceHighlight
 local connections = {}
+
+local function getGroupTag(groupId)
+	return GROUP_TAG_PREFIX .. groupId
+end
+
+local function getGroupId(instance)
+	for _, tag in CollectionService:GetTags(instance) do
+		if string.sub(tag, 1, #GROUP_TAG_PREFIX) == GROUP_TAG_PREFIX then
+			return string.sub(tag, #GROUP_TAG_PREFIX + 1)
+		end
+	end
+	return nil
+end
 
 local function getCamera()
 	return workspace.CurrentCamera or workspace:FindFirstChildOfClass("Camera")
@@ -93,11 +106,11 @@ local function trackGroupPart(groupId, part)
 			if cutterIndex then
 				table.remove(cutters, cutterIndex)
 			end
-			if part:IsDescendantOf(workspace) and part:GetAttribute(GROUP_ATTRIBUTE) == groupId then
+			if part:IsDescendantOf(workspace) and CollectionService:HasTag(part, getGroupTag(groupId)) then
 				local camera = getCamera()
-				if part:GetAttribute(CUTTER_ATTRIBUTE) == true and camera and part:IsDescendantOf(camera) then
+				if CollectionService:HasTag(part, CUTTER_TAG) and camera and part:IsDescendantOf(camera) then
 					table.insert(cutters, part)
-				elseif part:GetAttribute(CUTTER_ATTRIBUTE) ~= true and (not camera or not part:IsDescendantOf(camera)) then
+				elseif not CollectionService:HasTag(part, CUTTER_TAG) and (not camera or not part:IsDescendantOf(camera)) then
 					table.insert(targets, part)
 				end
 			end
@@ -131,14 +144,11 @@ local function getParts(groupId)
 	if not cached then
 		cached = { targets = {}, cutters = {} }
 		local camera = getCamera()
-		for _, instance in workspace:GetDescendants() do
-			if instance:IsA("BasePart") and instance:GetAttribute(GROUP_ATTRIBUTE) == groupId then
-				if instance:GetAttribute(CUTTER_ATTRIBUTE) == true and camera and instance:IsDescendantOf(camera) then
+		for _, instance in CollectionService:GetTagged(getGroupTag(groupId)) do
+			if instance:IsA("BasePart") and instance:IsDescendantOf(workspace) then
+				if CollectionService:HasTag(instance, CUTTER_TAG) and camera and instance:IsDescendantOf(camera) then
 					table.insert(cached.cutters, instance)
-				elseif
-					instance:GetAttribute(CUTTER_ATTRIBUTE) ~= true
-					and (not camera or not instance:IsDescendantOf(camera))
-				then
+				elseif not CollectionService:HasTag(instance, CUTTER_TAG) and (not camera or not instance:IsDescendantOf(camera)) then
 					table.insert(cached.targets, instance)
 				end
 				trackGroupPart(groupId, instance)
@@ -152,7 +162,7 @@ end
 local function getGroupFromSelection()
 	for _, instance in Selection:Get() do
 		if instance:IsA("BasePart") then
-			local groupId = instance:GetAttribute(GROUP_ATTRIBUTE)
+			local groupId = getGroupId(instance)
 			if groupId then
 				return groupId
 			end
@@ -201,8 +211,8 @@ local function endCut(groupId)
 	end
 	local targets, cutters = getParts(groupId)
 	for _, instance in targets do
-		instance:SetAttribute(GROUP_ATTRIBUTE, nil)
-		instance:SetAttribute(CUTTER_ATTRIBUTE, nil)
+		CollectionService:RemoveTag(instance, getGroupTag(groupId))
+		CollectionService:RemoveTag(instance, CUTTER_TAG)
 		untrackGroupPart(instance)
 	end
 	for _, cutter in cutters do
@@ -235,7 +245,7 @@ local function markCuttable()
 	addPreviousGroup(currentGroupId)
 	for _, instance in Selection:Get() do
 		if instance:IsA("BasePart") then
-			addPreviousGroup(instance:GetAttribute(GROUP_ATTRIBUTE))
+			addPreviousGroup(getGroupId(instance))
 		end
 	end
 	local recording = ChangeHistoryService:TryBeginRecording("HoleCutter_MarkGroup", "Mark Cuttable")
@@ -253,8 +263,8 @@ local function markCuttable()
 	groupCache[groupId] = { targets = selected, cutters = {} }
 	for _, part in selected do
 		untrackGroupPart(part)
-		part:SetAttribute(GROUP_ATTRIBUTE, groupId)
-		part:SetAttribute(CUTTER_ATTRIBUTE, nil)
+		CollectionService:AddTag(part, getGroupTag(groupId))
+		CollectionService:RemoveTag(part, CUTTER_TAG)
 		trackGroupPart(groupId, part)
 	end
 	ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
@@ -354,7 +364,7 @@ local function ArePropertiesEqual(first, second)
 			return false
 		end
 	end
-	if first:GetAttribute(GROUP_ATTRIBUTE) ~= second:GetAttribute(GROUP_ATTRIBUTE) then
+	if getGroupId(first) ~= getGroupId(second) then
 		return false
 	end
 	return true
@@ -818,8 +828,11 @@ local function applyCuts()
 	end
 
 	for _, output in outputs do
-		output:SetAttribute(GROUP_ATTRIBUTE, nil)
-		output:SetAttribute(CUTTER_ATTRIBUTE, nil)
+		local outputGroupId = getGroupId(output)
+		if outputGroupId then
+			CollectionService:RemoveTag(output, getGroupTag(outputGroupId))
+		end
+		CollectionService:RemoveTag(output, CUTTER_TAG)
 	end
 	endCut(groupId)
 	ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
@@ -859,9 +872,9 @@ local function createCutter(hitPosition, hitNormal)
 	cutter.TopSurface = Enum.SurfaceType.Smooth
 	cutter.BottomSurface = Enum.SurfaceType.Smooth
 	cutter.CFrame = CFrame.lookAt(hitPosition, hitPosition + hitNormal)
-	cutter:SetAttribute(GROUP_ATTRIBUTE, currentGroupId)
-	cutter:SetAttribute(CUTTER_ATTRIBUTE, true)
 	cutter.Parent = clientFolder
+	CollectionService:AddTag(cutter, getGroupTag(currentGroupId))
+	CollectionService:AddTag(cutter, CUTTER_TAG)
 	local _, cutters = getParts(currentGroupId)
 	table.insert(cutters, cutter)
 	trackGroupPart(currentGroupId, cutter)
@@ -893,7 +906,7 @@ local function beginPlacement()
 			if
 				ray
 				and ray.Instance:IsA("BasePart")
-				and ray.Instance:GetAttribute(GROUP_ATTRIBUTE) == currentGroupId
+				and getGroupId(ray.Instance) == currentGroupId
 			then
 				surfaceHighlight.Adornee = ray.Instance
 				surfaceHighlight.TargetSurface = normalId(ray.Instance, ray.Normal)
@@ -912,7 +925,7 @@ local function beginPlacement()
 			if
 				ray
 				and ray.Instance:IsA("BasePart")
-				and ray.Instance:GetAttribute(GROUP_ATTRIBUTE) == currentGroupId
+				and getGroupId(ray.Instance) == currentGroupId
 			then
 				createCutter(ray.Position, ray.Normal)
 				placing = false
