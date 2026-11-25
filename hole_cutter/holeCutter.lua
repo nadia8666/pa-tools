@@ -135,7 +135,9 @@ local function trackGroupPart(groupId, part)
 				local camera = getCamera()
 				if CollectionService:HasTag(part, CUTTER_TAG) and camera and part:IsDescendantOf(camera) then
 					table.insert(cutters, part)
-				elseif not CollectionService:HasTag(part, CUTTER_TAG) and (not camera or not part:IsDescendantOf(camera)) then
+				elseif
+				not CollectionService:HasTag(part, CUTTER_TAG) and (not camera or not part:IsDescendantOf(camera))
+			then
 					table.insert(targets, part)
 				end
 			end
@@ -185,7 +187,10 @@ local function getParts(groupId)
 		if instance:IsA("BasePart") and instance:IsDescendantOf(workspace) then
 			if CollectionService:HasTag(instance, CUTTER_TAG) and camera and instance:IsDescendantOf(camera) then
 				table.insert(cutters, instance)
-			elseif not CollectionService:HasTag(instance, CUTTER_TAG) and (not camera or not instance:IsDescendantOf(camera)) then
+			elseif
+				not CollectionService:HasTag(instance, CUTTER_TAG)
+				and (not camera or not instance:IsDescendantOf(camera))
+			then
 				table.insert(targets, instance)
 			end
 			trackGroupPart(groupId, instance)
@@ -436,8 +441,11 @@ local function isAlignedTo(target, part)
 	local function aligned(vector)
 		return math.max(math.abs(vector.X), math.abs(vector.Y), math.abs(vector.Z)) > 0.999999
 	end
-	return isAxisAligned(target.CFrame) and isAxisAligned(part.CFrame)
-		and aligned(relative.RightVector) and aligned(relative.UpVector) and aligned(relative.LookVector)
+	return isAxisAligned(target.CFrame)
+		and isAxisAligned(part.CFrame)
+		and aligned(relative.RightVector)
+		and aligned(relative.UpVector)
+		and aligned(relative.LookVector)
 end
 
 local function canSplitManually(target, cutters)
@@ -532,7 +540,11 @@ local function splitTarget(target, cutters)
 				continue
 			end
 			local function addPiece(pieceMin, pieceMax)
-				if pieceMax.X - pieceMin.X > epsilon and pieceMax.Y - pieceMin.Y > epsilon and pieceMax.Z - pieceMin.Z > epsilon then
+				if
+					pieceMax.X - pieceMin.X > epsilon
+					and pieceMax.Y - pieceMin.Y > epsilon
+					and pieceMax.Z - pieceMin.Z > epsilon
+				then
 					table.insert(nextPieces, { min = pieceMin, max = pieceMax })
 				end
 			end
@@ -982,11 +994,7 @@ local function beginPlacement()
 				return
 			end
 			local ray = workspace:Raycast(mouse.UnitRay.Origin, mouse.UnitRay.Direction * 1000)
-			if
-				ray
-				and ray.Instance:IsA("BasePart")
-				and getGroupId(ray.Instance) == currentGroupId
-			then
+			if ray and ray.Instance:IsA("BasePart") and getGroupId(ray.Instance) == currentGroupId then
 				surfaceHighlight.Adornee = ray.Instance
 				surfaceHighlight.TargetSurface = normalId(ray.Instance, ray.Normal)
 			else
@@ -1001,11 +1009,7 @@ local function beginPlacement()
 				return
 			end
 			local ray = workspace:Raycast(mouse.UnitRay.Origin, mouse.UnitRay.Direction * 1000)
-			if
-				ray
-				and ray.Instance:IsA("BasePart")
-				and getGroupId(ray.Instance) == currentGroupId
-			then
+			if ray and ray.Instance:IsA("BasePart") and getGroupId(ray.Instance) == currentGroupId then
 				createCutter(ray.Position, ray.Normal)
 				placing = false
 				surfaceHighlight.Adornee = nil
